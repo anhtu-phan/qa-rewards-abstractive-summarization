@@ -1,0 +1,4 @@
+argparse==1.2.1		
+cchardet	
+lxml
+requests==2.2.1

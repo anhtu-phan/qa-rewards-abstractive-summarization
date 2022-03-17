@@ -174,7 +174,7 @@ if __name__ == "__main__":
   for line in open(map_webarxiv_bbcid_file).readlines():
     data = line.strip().split()
     bbcids_dict[data[1]] = data[0]
-  print len(bbcids_dict)
+  print(len(bbcids_dict))
 
   count = 0
 
@@ -210,7 +210,7 @@ if __name__ == "__main__":
     foutput.close()
 
     if count%1000 == 0:
-      print count
+      print(count)
     count += 1
       
   failed_id_file.close()
