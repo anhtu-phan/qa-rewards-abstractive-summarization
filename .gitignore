@@ -1,7 +1,5 @@
-#submodule
-trl/*
-
 *.DS_Store
+datasets/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
