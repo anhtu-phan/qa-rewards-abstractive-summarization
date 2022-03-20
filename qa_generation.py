@@ -169,8 +169,8 @@ class QAGeneration:
 if __name__ == "__main__":
     qa_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-base-qg-hl")
     qa_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-base-qg-hl")
-    ans_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-small-qa-qg-hl")
-    ans_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-small-qa-qg-hl")
+    ans_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-base-qa-qg-hl")
+    ans_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-base-qa-qg-hl")
     qa_gen = QAGeneration(model=qa_model, tokenizer=qa_tokenizer, ans_model=ans_model, ans_tokenizer=ans_tokenizer)
     text4 = "Forrest Gump is a 1994 American comedy-drama film directed by Robert Zemeckis and written by Eric Roth. \
         It is based on the 1986 novel of the same name by Winston Groom and stars Tom Hanks, Robin Wright, Gary Sinise, \
