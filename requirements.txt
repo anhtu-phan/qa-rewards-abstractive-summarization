@@ -2,3 +2,14 @@ argparse==1.2.1
 cchardet	
 lxml
 requests==2.2.1
+numpy~=1.19.5
+torch~=1.10.2
+transformers~=4.3.2
+setuptools~=58.0.4
+configparser~=5.2.0
+wandb~=0.10.20
+pandas~=1.1.5
+tqdm~=4.63.0
+datasets~=1.17.0
+trl~=0.0.3
+nltk~=3.6.7
