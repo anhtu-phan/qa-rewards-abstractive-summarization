@@ -9,8 +9,8 @@ from transformers import (
 )
 from datasets import load_dataset
 import torch
-from trl.ppo import PPOTrainer
-from trl.gpt2 import GPT2HeadWithValueModel, respond_to_batch
+from ppo.ppo import PPOTrainer
+from ppo.gpt2 import GPT2HeadWithValueModel, respond_to_batch
 import pandas as pd
 import numpy as np
 from tqdm import tqdm

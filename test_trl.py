@@ -12,9 +12,9 @@ from datasets import load_dataset
 from transformers import GPT2Tokenizer
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from trl.gpt2 import GPT2HeadWithValueModel, respond_to_batch
-from trl.ppo import PPOTrainer
-from trl.core import build_bert_batch_from_txt
+from ppo.gpt2 import GPT2HeadWithValueModel, respond_to_batch
+from ppo.ppo import PPOTrainer
+from ppo.core import build_bert_batch_from_txt
 
 config = {
     "lm_name": "lvwerra/gpt2-imdb",
