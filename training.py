@@ -1,6 +1,8 @@
 from transformers import (
+    AutoConfig,
     PegasusForConditionalGeneration,
     PegasusTokenizer,
+    GPT2Tokenizer,
     AutoTokenizer,
     AutoModelForQuestionAnswering,
     AutoModelForSeq2SeqLM,
@@ -8,6 +10,7 @@ from transformers import (
 from datasets import load_dataset
 import torch
 from trl.ppo import PPOTrainer
+from trl.gpt2 import GPT2HeadWithValueModel, respond_to_batch
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
@@ -19,20 +22,28 @@ from qa_generation import QAGeneration
 tqdm.pandas()
 
 config = {
-    "batch_size": 8,
-    "steps": 80,
+    "batch_size": 16,
+    "steps": 100000,
     "forward_batch_size": 4,
     "max_token_len": 512,
     "max_sum_token_len": 128,
-    "summary_model_name": "google/pegasus-xsum",
+    "summary_model_name": "gpt2",
 }
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(device)
 
-summary_model = PegasusForConditionalGeneration.from_pretrained(config['summary_model_name']).to(device)
-summary_model_ref = PegasusForConditionalGeneration.from_pretrained(config['summary_model_name']).to(device)
-summary_tokenizer = PegasusTokenizer.from_pretrained(config['summary_model_name'])
+if config['summary_model_name'] == "google_pegasus_xsum":
+    summary_model = PegasusForConditionalGeneration.from_pretrained("google/pegasus-xsum").to(device)
+    summary_model_ref = PegasusForConditionalGeneration.from_pretrained("google/pegasus-xsum").to(device)
+    summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
+elif config['summary_model_name'] == "gpt2":
+    summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+    summary_model = GPT2HeadWithValueModel.from_pretrained("gpt2")
+    summary_model_ref = GPT2HeadWithValueModel.from_pretrained("gpt2")
+else:
+    raise NotImplementedError
+
 
 qa_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-base-qg-hl")
 qa_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-base-qg-hl").to(device)
@@ -44,9 +55,6 @@ gen_answer_model = AutoModelForQuestionAnswering.from_pretrained("distilbert-bas
 
 def prepare_data():
     ds = load_dataset("xsum", split="train")
-    # print(ds[0])
-    # print(ds.shape)
-    # print(ds.features)
     ds.set_format('pandas')
     df = ds[:]
     return df
@@ -144,31 +152,33 @@ def reward_calculation(generated_summaries, ground_truth_summaries):
         r_a = 0
         for a_idx, a_g in enumerate(a_g_a_):
             r_a += norm_levenshtein(a_g, l_a_g_a[idx][a_idx])
-        r_a = r_a / len(a_g_a_)
 
         a_g_t_ = gen_answer(t_questions, generated_summaries[idx])
         r_t = 0
         for t_idx, a_t in enumerate(a_g_t_):
             r_t += norm_levenshtein(a_t, l_a_g_t[idx][t_idx])
-        r_t = r_t / len(a_g_t_)
-        reward.append((r_a + r_t) / 2)
+        reward.append((r_a + r_t) / (len(a_g_a_)+len(a_g_t_)))
+
     return torch.tensor(reward)
 
 
 def tokenize_document(row):
-    encoding = summary_tokenizer.encode_plus(row['document'], return_tensors="pt", truncation=True, padding="max_length").to(device)
+    if not summary_tokenizer.pad_token:
+        summary_tokenizer.pad_token = summary_tokenizer.eos_token
+    encoding = summary_tokenizer.encode_plus(row['document'], return_tensors="pt", truncation=True,
+                                             padding="max_length", max_length=config['max_token_len']).to(device)
     row['tokens'] = encoding["input_ids"][0, :]
     row['attention_mask'] = encoding["attention_mask"][0, :]
     return row
 
 
 def main():
-    x_sum_path = "./datasets/x_sum.pkl"
+    x_sum_path = f"./datasets/x_sum_{config['summary_model_name']}.pkl"
     if os.path.exists(x_sum_path):
         df = pd.read_pickle(x_sum_path)
     else:
         df = prepare_data()
-        # TO-DO increase length of tokens
+        #TODO increase length of tokens
         df = df.progress_apply(tokenize_document, axis=1)
         df['query'] = df['tokens'].progress_apply(lambda x: summary_tokenizer.decode(x))
         df.to_pickle(x_sum_path)
@@ -184,12 +194,19 @@ def main():
         df_batch = df.sample(config['batch_size'])
         game_data['query'] = df_batch['query'].tolist()
         query_tensors = torch.stack(df_batch['tokens'].tolist())
-        attention_mask_tensors = torch.stack(df_batch['attention_mask'].tolist())
         ground_truth_sum = df_batch['summary'].tolist()
 
         t = time.time()
 
-        response_tensors = summary_model.generate(query_tensors)
+        if config['summary_model_name'] == 'gpt2':
+            response_tensors = []
+            for i in range(int(config['batch_size'] / config['forward_batch_size'])):
+                response = respond_to_batch(summary_model, query_tensors[i * config['forward_batch_size']:(i + 1) * config['forward_batch_size']],
+                                            txt_len=80)
+                response_tensors.append(response)
+            response_tensors = torch.cat(response_tensors)
+        else:
+            response_tensors = summary_model.generate(query_tensors)
         game_data['response'] = [summary_tokenizer.decode(response_tensors[i, :]) for i in range(config['batch_size'])]
         timing['time/get_response'] = time.time() - t
 
@@ -198,7 +215,7 @@ def main():
         timing['time/get_rewards'] = time.time() - t
 
         t = time.time()
-        _ = ppo_trainer.step(query_tensors, response_tensors, rewards, attention_mask_tensors)
+        _ = ppo_trainer.step(query_tensors, response_tensors, rewards)
         timing['time/optimization'] = time.time() - t
 
         timing['time/epoch'] = time.time() - t0
