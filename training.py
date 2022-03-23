@@ -173,6 +173,9 @@ def tokenize_document(row):
 
 
 def main():
+    if not os.path.exists("./datasets"):
+        os.makedirs("./datasets")
+
     x_sum_path = f"./datasets/x_sum_{config['summary_model_name']}.pkl"
     if os.path.exists(x_sum_path):
         df = pd.read_pickle(x_sum_path)
