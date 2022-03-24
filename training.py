@@ -68,7 +68,7 @@ def gen_answer(questions, context):
 
     str_questions = "\n".join(questions)
     print(f"******************gen-answer******************\n{str_questions}\n\n")
-    encoding = gen_answer_tokenizer.batch_encode_plus(batch_question_context, return_tensors="pt")
+    encoding = gen_answer_tokenizer.batch_encode_plus(batch_question_context, padding=True, return_tensors="pt")
     input_ids, attention_mask = encoding["input_ids"], encoding["attention_mask"]
     outputs = gen_answer_model(input_ids, attention_mask=attention_mask)
     start_scores, end_scores = outputs.start_logits, outputs.end_logits
@@ -82,7 +82,7 @@ def gen_answer(questions, context):
         answer_tokens_string = gen_answer_tokenizer.convert_tokens_to_string(answer_tokens)
         answers.append(answer_tokens_string)
 
-    # print(answers)
+    print(f"{answers}\n-------------------------")
     return answers
 
 
