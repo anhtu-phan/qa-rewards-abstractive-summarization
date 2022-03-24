@@ -67,6 +67,8 @@ def gen_answer(questions, context):
         batch_question_context.append((question, context))
 
     str_questions = "\n".join(questions)
+    if str_questions.strip() == '':
+        return []
     print(f"******************gen-answer******************\n{str_questions}\n\n")
     encoding = gen_answer_tokenizer.batch_encode_plus(batch_question_context, padding=True, return_tensors="pt")
     input_ids, attention_mask = encoding["input_ids"], encoding["attention_mask"]
