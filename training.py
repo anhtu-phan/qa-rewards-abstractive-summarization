@@ -22,9 +22,9 @@ from qa_generation import QAGeneration
 tqdm.pandas()
 
 config = {
-    "batch_size": 16,
+    "batch_size": 8,
     "steps": 100000,
-    "forward_batch_size": 4,
+    "forward_batch_size": 2,
     "max_token_len": 512,
     "max_sum_token_len": 128,
     "summary_model_name": "gpt2",
@@ -46,13 +46,10 @@ else:
 summary_tokenizer.pad_token = summary_tokenizer.eos_token
 
 qa_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-base-qg-hl")
-qa_tokenizer.pad_token = qa_tokenizer.eos_token
 qa_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-base-qg-hl").to(device)
 ans_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-small-qa-qg-hl")
-ans_tokenizer.pad_token = ans_tokenizer.eos_token
 ans_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-small-qa-qg-hl").to(device)
 gen_answer_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-cased-distilled-squad")
-gen_answer_tokenizer.pad_token = gen_answer_tokenizer.eos_token
 gen_answer_model = AutoModelForQuestionAnswering.from_pretrained("distilbert-base-cased-distilled-squad").to(device)
 
 
@@ -69,7 +66,9 @@ def gen_answer(questions, context):
     for question in questions:
         batch_question_context.append((question, context))
 
-    encoding = gen_answer_tokenizer.batch_encode_plus(batch_question_context, padding=True, return_tensors="pt")
+    str_questions = "\n".join(questions)
+    print(f"******************gen-answer******************\n{str_questions}\n\n")
+    encoding = gen_answer_tokenizer.batch_encode_plus(batch_question_context, return_tensors="pt")
     input_ids, attention_mask = encoding["input_ids"], encoding["attention_mask"]
     outputs = gen_answer_model(input_ids, attention_mask=attention_mask)
     start_scores, end_scores = outputs.start_logits, outputs.end_logits
