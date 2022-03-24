@@ -43,13 +43,16 @@ elif config['summary_model_name'] == "gpt2":
     summary_model_ref = GPT2HeadWithValueModel.from_pretrained("gpt2")
 else:
     raise NotImplementedError
-
+summary_tokenizer.pad_token = summary_tokenizer.eos_token
 
 qa_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-base-qg-hl")
+qa_tokenizer.pad_token = qa_tokenizer.eos_token
 qa_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-base-qg-hl").to(device)
 ans_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-small-qa-qg-hl")
+ans_tokenizer.pad_token = ans_tokenizer.eos_token
 ans_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-small-qa-qg-hl").to(device)
 gen_answer_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-cased-distilled-squad")
+gen_answer_tokenizer.pad_token = gen_answer_tokenizer.eos_token
 gen_answer_model = AutoModelForQuestionAnswering.from_pretrained("distilbert-base-cased-distilled-squad").to(device)
 
 
@@ -163,8 +166,6 @@ def reward_calculation(generated_summaries, ground_truth_summaries):
 
 
 def tokenize_document(row):
-    if not summary_tokenizer.pad_token:
-        summary_tokenizer.pad_token = summary_tokenizer.eos_token
     encoding = summary_tokenizer.encode_plus(row['document'], return_tensors="pt", truncation=True,
                                              padding="max_length", max_length=config['max_token_len']).to(device)
     row['tokens'] = encoding["input_ids"][0, :]
