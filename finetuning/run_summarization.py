@@ -37,8 +37,8 @@ from transformers import (
     AutoTokenizer,
     DataCollatorForSeq2Seq,
     HfArgumentParser,
-    MBart50Tokenizer,
-    MBart50TokenizerFast,
+    # MBart50Tokenizer,
+    # MBart50TokenizerFast,
     MBartTokenizer,
     MBartTokenizerFast,
     Seq2SeqTrainer,
@@ -46,12 +46,12 @@ from transformers import (
     set_seed,
 )
 from transformers.trainer_utils import get_last_checkpoint
-from transformers.utils import check_min_version, is_offline_mode
+# from transformers.utils import check_min_version, is_offline_mode
 from transformers.utils.versions import require_version
 
 
 # Will error if the minimal version of Transformers is not installed. Remove at your own risks.
-check_min_version("4.18.0.dev0")
+# check_min_version("4.18.0.dev0")
 
 require_version("datasets>=1.8.0", "To fix: pip install -r examples/pytorch/summarization/requirements.txt")
 
@@ -60,15 +60,15 @@ logger = logging.getLogger(__name__)
 try:
     nltk.data.find("tokenizers/punkt")
 except (LookupError, OSError):
-    if is_offline_mode():
-        raise LookupError(
-            "Offline mode: run this script without TRANSFORMERS_OFFLINE first to download nltk data files"
-        )
+    # if is_offline_mode():
+    #     raise LookupError(
+    #         "Offline mode: run this script without TRANSFORMERS_OFFLINE first to download nltk data files"
+    #     )
     with FileLock(".lock") as lock:
         nltk.download("punkt", quiet=True)
 
 # A list of all multilingual tokenizer which require lang attribute.
-MULTILINGUAL_TOKENIZERS = [MBartTokenizer, MBartTokenizerFast, MBart50Tokenizer, MBart50TokenizerFast]
+# MULTILINGUAL_TOKENIZERS = [MBartTokenizer, MBartTokenizerFast, MBart50Tokenizer, MBart50TokenizerFast]
 
 
 @dataclass
@@ -429,20 +429,20 @@ def main():
         logger.info("There is nothing to do. Please pass `do_train`, `do_eval` and/or `do_predict`.")
         return
 
-    if isinstance(tokenizer, tuple(MULTILINGUAL_TOKENIZERS)):
-        assert (
-            data_args.lang is not None
-        ), f"{tokenizer.__class__.__name__} is a multilingual tokenizer which requires --lang argument"
-
-        tokenizer.src_lang = data_args.lang
-        tokenizer.tgt_lang = data_args.lang
-
-        # For multilingual translation models like mBART-50 and M2M100 we need to force the target language token
-        # as the first generated token. We ask the user to explicitly provide this as --forced_bos_token argument.
-        forced_bos_token_id = (
-            tokenizer.lang_code_to_id[data_args.forced_bos_token] if data_args.forced_bos_token is not None else None
-        )
-        model.config.forced_bos_token_id = forced_bos_token_id
+    # if isinstance(tokenizer, tuple(MULTILINGUAL_TOKENIZERS)):
+    #     assert (
+    #         data_args.lang is not None
+    #     ), f"{tokenizer.__class__.__name__} is a multilingual tokenizer which requires --lang argument"
+    #
+    #     tokenizer.src_lang = data_args.lang
+    #     tokenizer.tgt_lang = data_args.lang
+    #
+    #     # For multilingual translation models like mBART-50 and M2M100 we need to force the target language token
+    #     # as the first generated token. We ask the user to explicitly provide this as --forced_bos_token argument.
+    #     forced_bos_token_id = (
+    #         tokenizer.lang_code_to_id[data_args.forced_bos_token] if data_args.forced_bos_token is not None else None
+    #     )
+    #     model.config.forced_bos_token_id = forced_bos_token_id
 
     # Get the column names for input/target.
     dataset_columns = summarization_name_mapping.get(data_args.dataset_name, None)
