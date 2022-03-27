@@ -1,11 +1,15 @@
 from transformers import PegasusForConditionalGeneration
 from torch import nn
+from torch.nn import Identity
 
 
 class ValueHead(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.detach_head = False
+
+        self.summary = Identity()
+        # if hasattr(config, )
 
 
 class PegasusHeadWithValueModel(PegasusForConditionalGeneration):

@@ -11,6 +11,7 @@ from datasets import load_dataset
 import torch
 from ppo.ppo import PPOTrainer
 from ppo.gpt2 import GPT2HeadWithValueModel, respond_to_batch
+from ppo.pegasus import PegasusHeadWithValueModel
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
@@ -34,13 +35,13 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print(device)
 
 if config['summary_model_name'] == "google_pegasus_xsum":
-    summary_model = PegasusForConditionalGeneration.from_pretrained("google/pegasus-xsum").to(device)
-    summary_model_ref = PegasusForConditionalGeneration.from_pretrained("google/pegasus-xsum").to(device)
+    summary_model = PegasusHeadWithValueModel.from_pretrained("google/pegasus-xsum").to(device)
+    summary_model_ref = PegasusHeadWithValueModel.from_pretrained("google/pegasus-xsum").to(device)
     summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
 elif config['summary_model_name'] == "gpt2":
     summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    summary_model = GPT2HeadWithValueModel.from_pretrained("gpt2")
-    summary_model_ref = GPT2HeadWithValueModel.from_pretrained("gpt2")
+    summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-1000", from_tf=True)
+    summary_model_ref = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-1000", from_tf=True)
 else:
     raise NotImplementedError
 summary_tokenizer.pad_token = summary_tokenizer.eos_token
@@ -180,8 +181,10 @@ def main():
 
     x_sum_path = f"./datasets/x_sum_{config['summary_model_name']}.pkl"
     if os.path.exists(x_sum_path):
+        print("load dataset")
         df = pd.read_pickle(x_sum_path)
     else:
+        print("prepare dataset")
         df = prepare_data()
         #TODO increase length of tokens
         df = df.progress_apply(tokenize_document, axis=1)
@@ -211,7 +214,7 @@ def main():
                 response_tensors.append(response)
             response_tensors = torch.cat(response_tensors)
         else:
-            response_tensors = summary_model.generate(query_tensors)
+            response_tensors = summary_model.generate(input_ids=query_tensors)
         game_data['response'] = [summary_tokenizer.decode(response_tensors[i, :]) for i in range(config['batch_size'])]
         timing['time/get_response'] = time.time() - t
 
