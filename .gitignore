@@ -1,9 +1,9 @@
 # dataset
-./finetuning/output/*
+finetuning/output/*
+datasets/*
 
 .idea/*
 *.DS_Store
-datasets/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
