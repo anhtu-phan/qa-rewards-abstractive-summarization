@@ -9,7 +9,30 @@ class ValueHead(nn.Module):
         self.detach_head = False
 
         self.summary = Identity()
-        # if hasattr(config, )
+        self.summary = nn.Linear(config.hidden_size, config.num_labels)
+
+        self.activation = Identity()
+        self.activation = nn.Tanh()
+
+        self.first_dropout = Identity()
+        self.first_dropout = nn.Dropout(config.dropout)
+
+        self.last_dropout = Identity()
+        self.last_dropout = nn.Dropout(config.activation_dropout)
+
+        self.flatten = nn.Flatten()
+
+    def forward(self, hidden_states, cls_index=None):
+        if self.detach_head:
+            output = hidden_states.detach()
+        else:
+            output = hidden_states
+        output = self.first_dropout(output)
+        output = self.summary(output)
+        output = self.activation(output)
+        output = self.last_dropout(output)
+
+        return output
 
 
 class PegasusHeadWithValueModel(PegasusForConditionalGeneration):
@@ -37,7 +60,6 @@ class PegasusHeadWithValueModel(PegasusForConditionalGeneration):
         decoder_attention_mask=None,
         head_mask=None,
         decoder_head_mask=None,
-        cross_attn_head_mask=None,
         encoder_outputs=None,
         past_key_values=None,
         inputs_embeds=None,
@@ -51,13 +73,26 @@ class PegasusHeadWithValueModel(PegasusForConditionalGeneration):
         transformer_outputs = self.transformer(
             input_ids=input_ids,
             decoder_input_ids=decoder_input_ids,
+            attention_mask=attention_mask,
+            past_key_values=past_key_values,
+            decoder_attention_mask=decoder_attention_mask,
+            head_mask=head_mask,
+            decoder_head_mask=decoder_head_mask,
+            encoder_outputs=encoder_outputs,
+            inputs_embeds=inputs_embeds,
+            decoder_inputs_embeds=decoder_inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict
         )
 
-        hidden_states = transformer_outputs[0]
+        hidden_states = transformer_outputs.encoder_last_hidden_state
 
         lm_logits = self.lm_head(hidden_states)
         value = self.v_head(hidden_states).squeeze(-1)
 
-        outputs = (lm_logits,) + transformer_outputs[1:] + (value,)
+        outputs = (lm_logits,) + (transformer_outputs.past_key_values, ) + (value,)
 
         return outputs
+

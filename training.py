@@ -10,7 +10,8 @@ from transformers import (
 from datasets import load_dataset
 import torch
 from ppo.ppo import PPOTrainer
-from ppo.gpt2 import GPT2HeadWithValueModel, respond_to_batch
+from ppo.gpt2 import GPT2HeadWithValueModel
+from ppo.utils import respond_to_batch
 from ppo.pegasus import PegasusHeadWithValueModel
 import pandas as pd
 import numpy as np
@@ -36,12 +37,14 @@ print(device)
 
 if config['summary_model_name'] == "google_pegasus_xsum":
     summary_model = PegasusHeadWithValueModel.from_pretrained("google/pegasus-xsum").to(device)
-    summary_model_ref = PegasusHeadWithValueModel.from_pretrained("google/pegasus-xsum").to(device)
+    summary_model_ref = PegasusForConditionalGeneration.from_pretrained("google/pegasus-xsum").to(device)
     summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
 elif config['summary_model_name'] == "gpt2":
     summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-1000")
-    summary_model_ref = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-1000")
+    summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-3000")
+    summary_model_ref = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-3000")
+    # summary_model = GPT2HeadWithValueModel.from_pretrained("gpt2")
+    # summary_model_ref = GPT2HeadWithValueModel.from_pretrained("gpt2")
 else:
     raise NotImplementedError
 summary_tokenizer.pad_token = summary_tokenizer.eos_token
@@ -206,16 +209,19 @@ def main():
 
         t = time.time()
 
-        if config['summary_model_name'] == 'gpt2':
-            response_tensors = []
-            for i in range(int(config['batch_size'] / config['forward_batch_size'])):
+        response_tensors = []
+        for i in range(int(config['batch_size'] / config['forward_batch_size'])):
+            if config['summary_model_name'] == "gpt2":
                 response = respond_to_batch(summary_model, query_tensors[i * config['forward_batch_size']:(i + 1) * config['forward_batch_size']],
-                                            txt_len=80)
-                response_tensors.append(response)
-            response_tensors = torch.cat(response_tensors)
-        else:
-            response_tensors = summary_model.generate(input_ids=query_tensors)
+                                            txt_len=80, seq2seq=False)
+            elif config['summary_model_name'] == "google_pegasus_xsum":
+                response = respond_to_batch(summary_model, query_tensors[i * config['forward_batch_size']:(i + 1) * config['forward_batch_size']],
+                                        txt_len=80, seq2seq=True)
+            response_tensors.append(response)
+        response_tensors = torch.cat(response_tensors)
+        # ref_response_tensor = summary_model_ref.generate(query_tensors)
         game_data['response'] = [summary_tokenizer.decode(response_tensors[i, :]) for i in range(config['batch_size'])]
+        # ref_response_decode = [summary_tokenizer.decode(ref_response_tensor[i, :]) for i in range(config['batch_size'])]
         timing['time/get_response'] = time.time() - t
 
         t = time.time()
