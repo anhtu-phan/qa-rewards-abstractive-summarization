@@ -181,6 +181,8 @@ def tokenize_document(row):
 def main():
     if not os.path.exists("./datasets"):
         os.makedirs("./datasets")
+    if not os.path.exists("./checkpoint"):
+        os.makedirs("./checkpoint")
 
     x_sum_path = f"./datasets/x_sum_{config['summary_model_name']}.pkl"
     if os.path.exists(x_sum_path):
@@ -195,7 +197,7 @@ def main():
         df.to_pickle(x_sum_path)
 
     ppo_trainer = PPOTrainer(summary_model, summary_model_ref, **config)
-    for _ in tqdm(range(int(config['steps'] / config['batch_size']))):
+    for step_idx in tqdm(range(int(config['steps'] / config['batch_size']))):
         torch.cuda.empty_cache()
         logs = dict()
         game_data = dict()
@@ -238,6 +240,8 @@ def main():
         logs['env/reward_mean'] = torch.mean(rewards)
         logs['env/reward_std'] = torch.std(rewards).cpu().numpy()
         print(str(logs))
+        if step_idx != 0 and step_idx % 500 == 0:
+            summary_model.save_pretrained(f"./checkpoint/checkpoint-{step_idx}")
 
 
 if __name__ == "__main__":
