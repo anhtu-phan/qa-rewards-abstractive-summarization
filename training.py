@@ -24,7 +24,7 @@ from qa_generation import QAGeneration
 tqdm.pandas()
 
 config = {
-    "batch_size": 8,
+    "batch_size": 4,
     "steps": 100000,
     "forward_batch_size": 2,
     "max_token_len": 512,
@@ -75,7 +75,7 @@ def gen_answer(questions, context):
         return []
     print(f"******************gen-answer******************\n{str_questions}\n\n")
     encoding = gen_answer_tokenizer.batch_encode_plus(batch_question_context, padding=True, return_tensors="pt")
-    input_ids, attention_mask = encoding["input_ids"], encoding["attention_mask"]
+    input_ids, attention_mask = encoding["input_ids"].to(device), encoding["attention_mask"].to(device)
     outputs = gen_answer_model(input_ids, attention_mask=attention_mask)
     start_scores, end_scores = outputs.start_logits, outputs.end_logits
 
@@ -167,7 +167,7 @@ def reward_calculation(generated_summaries, ground_truth_summaries):
             r_t += norm_levenshtein(a_t, l_a_g_t[idx][t_idx])
         reward.append((r_a + r_t) / (len(a_g_a_)+len(a_g_t_)))
 
-    return torch.tensor(reward)
+    return torch.tensor(reward).to(device)
 
 
 def tokenize_document(row):
@@ -219,11 +219,13 @@ def main():
             elif config['summary_model_name'] == "google_pegasus_xsum":
                 response = respond_to_batch(summary_model, query_tensors[i * config['forward_batch_size']:(i + 1) * config['forward_batch_size']],
                                         txt_len=80, seq2seq=True)
+            else:
+                raise NotImplementedError
             response_tensors.append(response)
-        response_tensors = torch.cat(response_tensors)
+        response_tensors = torch.cat(response_tensors).to(device)
         # ref_response_tensor = summary_model_ref.generate(query_tensors)
         game_data['response'] = [summary_tokenizer.decode(response_tensors[i, :]) for i in range(config['batch_size'])]
-        print(game_data['response'])
+        print(f"******************game_data['response']******************\n{game_data['response']}\n")
         # ref_response_decode = [summary_tokenizer.decode(ref_response_tensor[i, :]) for i in range(config['batch_size'])]
         timing['time/get_response'] = time.time() - t
 
