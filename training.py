@@ -41,8 +41,8 @@ if config['summary_model_name'] == "google_pegasus_xsum":
     summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
 elif config['summary_model_name'] == "gpt2":
     summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-3500")
-    summary_model_ref = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-3500")
+    summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-3500").to(device)
+    summary_model_ref = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-3500").to(device)
     # summary_model = GPT2HeadWithValueModel.from_pretrained("gpt2")
     # summary_model_ref = GPT2HeadWithValueModel.from_pretrained("gpt2")
 else:
@@ -206,7 +206,7 @@ def main():
 
         df_batch = df.sample(config['batch_size'])
         game_data['query'] = df_batch['query'].tolist()
-        query_tensors = torch.stack(df_batch['tokens'].tolist())
+        query_tensors = torch.stack(df_batch['tokens'].tolist()).to(device)
         ground_truth_sum = df_batch['summary'].tolist()
 
         t = time.time()
@@ -223,6 +223,7 @@ def main():
         response_tensors = torch.cat(response_tensors)
         # ref_response_tensor = summary_model_ref.generate(query_tensors)
         game_data['response'] = [summary_tokenizer.decode(response_tensors[i, :]) for i in range(config['batch_size'])]
+        print(game_data['response'])
         # ref_response_decode = [summary_tokenizer.decode(ref_response_tensor[i, :]) for i in range(config['batch_size'])]
         timing['time/get_response'] = time.time() - t
 
