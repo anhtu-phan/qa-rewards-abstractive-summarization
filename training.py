@@ -28,8 +28,8 @@ config = {
     "steps": 100000,
     "forward_batch_size": 2,
     "max_token_len": 512,
-    "max_sum_token_len": 128,
-    "summary_model_name": "gpt2",
+    "max_sum_token_len": 80,
+    "summary_model_name": "google_pegasus_xsum",
 }
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -165,7 +165,10 @@ def reward_calculation(generated_summaries, ground_truth_summaries):
         r_t = 0
         for t_idx, a_t in enumerate(a_g_t_):
             r_t += norm_levenshtein(a_t, l_a_g_t[idx][t_idx])
-        reward.append((r_a + r_t) / (len(a_g_a_)+len(a_g_t_)))
+        if (len(a_g_a_)+len(a_g_t_)) == 0:
+            reward.append(0)
+        else:
+            reward.append((r_a + r_t) / (len(a_g_a_)+len(a_g_t_)))
 
     return torch.tensor(reward).to(device)
 
@@ -208,21 +211,19 @@ def main():
         game_data['query'] = df_batch['query'].tolist()
         query_tensors = torch.stack(df_batch['tokens'].tolist()).to(device)
         ground_truth_sum = df_batch['summary'].tolist()
-
         t = time.time()
 
-        response_tensors = []
-        for i in range(int(config['batch_size'] / config['forward_batch_size'])):
-            if config['summary_model_name'] == "gpt2":
+        if config['summary_model_name'] == "gpt2":
+            response_tensors = []
+            for i in range(int(config['batch_size'] / config['forward_batch_size'])):
                 response = respond_to_batch(summary_model, query_tensors[i * config['forward_batch_size']:(i + 1) * config['forward_batch_size']],
-                                            txt_len=80, seq2seq=False)
-            elif config['summary_model_name'] == "google_pegasus_xsum":
-                response = respond_to_batch(summary_model, query_tensors[i * config['forward_batch_size']:(i + 1) * config['forward_batch_size']],
-                                        txt_len=80, seq2seq=True)
-            else:
-                raise NotImplementedError
-            response_tensors.append(response)
-        response_tensors = torch.cat(response_tensors).to(device)
+                                            txt_len=config["max_sum_token_len"], seq2seq=False)
+                response_tensors.append(response)
+            response_tensors = torch.cat(response_tensors).to(device)
+        elif config['summary_model_name'] == "google_pegasus_xsum":
+            response_tensors = summary_model.generate(input_ids=query_tensors).to(device)
+        else:
+            raise NotImplementedError
         # ref_response_tensor = summary_model_ref.generate(query_tensors)
         game_data['response'] = [summary_tokenizer.decode(response_tensors[i, :]) for i in range(config['batch_size'])]
         print(f"******************game_data['response']******************\n{game_data['response']}\n")
@@ -234,7 +235,14 @@ def main():
         timing['time/get_rewards'] = time.time() - t
 
         t = time.time()
-        _ = ppo_trainer.step(query_tensors, response_tensors, rewards)
+        if config['summary_model_name'] == "gpt2":
+            _ = ppo_trainer.step(query_tensors, response_tensors, rewards)
+        elif config['summary_model_name'] == "google_pegasus_xsum":
+            ground_truth_sum_encoding = summary_tokenizer.batch_encode_plus(df_batch['summary'], return_tensors="pt",
+                                                                       truncation=True, padding="max_length", max_length=config["max_sum_token_len"])
+            ground_truth_sum_ids = ground_truth_sum_encoding['input_ids'].to(device)
+            _ = ppo_trainer.step(query_tensors, response_tensors, rewards, ground_truth_sum_ids)
+
         timing['time/optimization'] = time.time() - t
 
         timing['time/epoch'] = time.time() - t0

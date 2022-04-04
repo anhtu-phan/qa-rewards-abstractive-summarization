@@ -17,6 +17,7 @@
 Fine-tuning the library models for sequence to sequence.
 """
 # You can also adapt this script on your own sequence to sequence task. Pointers for this are left as comments.
+# https://github.com/huggingface/transformers/blob/main/examples/pytorch/summarization/run_summarization.py
 
 import logging
 import os

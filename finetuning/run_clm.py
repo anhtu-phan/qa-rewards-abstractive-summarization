@@ -20,6 +20,7 @@ Here is the full list of checkpoints on the hub that can be fine-tuned by this s
 https://huggingface.co/models?filter=text-generation
 """
 # You can also adapt this script on your own causal language modeling task. Pointers for this are left as comments.
+# https://github.com/huggingface/transformers/blob/main/examples/pytorch/language-modeling/run_clm.py
 
 import logging
 import math

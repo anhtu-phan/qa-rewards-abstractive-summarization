@@ -40,6 +40,7 @@ class PegasusHeadWithValueModel(PegasusForConditionalGeneration):
     def __init__(self, config):
         super().__init__(config)
         config.num_labels = 1
+        config.output_hidden_states = True
         self.transformer = PegasusForConditionalGeneration(config)
         self.lm_head = nn.Linear(config.d_model, config.vocab_size, bias=False)
         self.v_head = ValueHead(config)
@@ -87,7 +88,7 @@ class PegasusHeadWithValueModel(PegasusForConditionalGeneration):
             return_dict=return_dict
         )
 
-        hidden_states = transformer_outputs.encoder_last_hidden_state
+        hidden_states = transformer_outputs.decoder_hidden_states[-1]
 
         lm_logits = self.lm_head(hidden_states)
         value = self.v_head(hidden_states).squeeze(-1)

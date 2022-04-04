@@ -1,6 +1,4 @@
-'''
-https://github.com/patil-suraj/question_generation/blob/master/pipelines.py
-'''
+# https://github.com/patil-suraj/question_generation/blob/master/pipelines.py
 
 import torch
 from transformers import(
