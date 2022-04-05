@@ -5,8 +5,8 @@
 #SBATCH --ntasks=1
 #SBATCH --partition=students
 #SBATCH --time=1-0:00:00
-#SBATCH --gres=gpu:mem11g:2
-#SBATCH --mem=32000
+#SBATCH --gres=gpu:1
+#SBATCH --mem=16000
 #SBATCH --mail-user=anhtu@cl.uni-heidelberg.de
 #SBATCH --mail-type=ALL
 

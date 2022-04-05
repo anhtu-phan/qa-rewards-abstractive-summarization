@@ -41,8 +41,10 @@ if config['summary_model_name'] == "google_pegasus_xsum":
     summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
 elif config['summary_model_name'] == "gpt2":
     summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-3500").to(device)
-    summary_model_ref = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-3500").to(device)
+    summary_model = GPT2HeadWithValueModel.from_pretrained(
+        pretrained_model_name_or_path="./finetuning/output/checkpoint-3500").to(device)
+    summary_model_ref = GPT2HeadWithValueModel.from_pretrained(
+        pretrained_model_name_or_path="./finetuning/output/checkpoint-3500").to(device)
     # summary_model = GPT2HeadWithValueModel.from_pretrained("gpt2")
     # summary_model_ref = GPT2HeadWithValueModel.from_pretrained("gpt2")
 else:
@@ -68,12 +70,14 @@ def gen_answer(questions, context):
     batch_question_context = []
 
     for question in questions:
+        if question.strip() == '':
+            continue
         batch_question_context.append((question, context))
 
     str_questions = "\n".join(questions)
     if str_questions.strip() == '':
         return []
-    print(f"******************gen-answer******************\n{str_questions}\n\n")
+    print(f"******************gen-answer******************\n{batch_question_context}\n\n")
     encoding = gen_answer_tokenizer.batch_encode_plus(batch_question_context, padding=True, return_tensors="pt")
     input_ids, attention_mask = encoding["input_ids"].to(device), encoding["attention_mask"].to(device)
     outputs = gen_answer_model(input_ids, attention_mask=attention_mask)
@@ -165,10 +169,10 @@ def reward_calculation(generated_summaries, ground_truth_summaries):
         r_t = 0
         for t_idx, a_t in enumerate(a_g_t_):
             r_t += norm_levenshtein(a_t, l_a_g_t[idx][t_idx])
-        if (len(a_g_a_)+len(a_g_t_)) == 0:
+        if (len(a_g_a_) + len(a_g_t_)) == 0:
             reward.append(0)
         else:
-            reward.append((r_a + r_t) / (len(a_g_a_)+len(a_g_t_)))
+            reward.append((r_a + r_t) / (len(a_g_a_) + len(a_g_t_)))
 
     return torch.tensor(reward).to(device)
 
@@ -194,7 +198,7 @@ def main():
     else:
         print("prepare dataset")
         df = prepare_data()
-        #TODO increase length of tokens
+        # TODO increase length of tokens
         df = df.progress_apply(tokenize_document, axis=1)
         df['query'] = df['tokens'].progress_apply(lambda x: summary_tokenizer.decode(x))
         df.to_pickle(x_sum_path)
@@ -213,21 +217,27 @@ def main():
         ground_truth_sum = df_batch['summary'].tolist()
         t = time.time()
 
-        if config['summary_model_name'] == "gpt2":
-            response_tensors = []
-            for i in range(int(config['batch_size'] / config['forward_batch_size'])):
-                response = respond_to_batch(summary_model, query_tensors[i * config['forward_batch_size']:(i + 1) * config['forward_batch_size']],
-                                            txt_len=config["max_sum_token_len"], seq2seq=False)
-                response_tensors.append(response)
-            response_tensors = torch.cat(response_tensors).to(device)
-        elif config['summary_model_name'] == "google_pegasus_xsum":
-            response_tensors = summary_model.generate(input_ids=query_tensors).to(device)
-        else:
-            raise NotImplementedError
-        # ref_response_tensor = summary_model_ref.generate(query_tensors)
+        response_tensors = []
+        for i in range(int(config['batch_size'] / config['forward_batch_size'])):
+            if config['summary_model_name'] == "gpt2":
+                response = respond_to_batch(summary_model, query_tensors[
+                                                           i * config['forward_batch_size']:(i + 1) * config[
+                                                               'forward_batch_size']],
+                                            txt_len=config["max_sum_token_len"])
+            elif config['summary_model_name'] == "google_pegasus_xsum":
+                response = respond_to_batch(summary_model, query_tensors[
+                                                           i * config['forward_batch_size']:(i + 1) * config[
+                                                               'forward_batch_size']],
+                                            txt_len=config["max_sum_token_len"],
+                                            eos_token=summary_tokenizer.eos_token_id, device=device)
+            else:
+                raise NotImplementedError
+
+            response_tensors.append(response)
+
+        response_tensors = torch.cat(response_tensors).to(device)
         game_data['response'] = [summary_tokenizer.decode(response_tensors[i, :]) for i in range(config['batch_size'])]
         print(f"******************game_data['response']******************\n{game_data['response']}\n")
-        # ref_response_decode = [summary_tokenizer.decode(ref_response_tensor[i, :]) for i in range(config['batch_size'])]
         timing['time/get_response'] = time.time() - t
 
         t = time.time()
@@ -238,10 +248,7 @@ def main():
         if config['summary_model_name'] == "gpt2":
             _ = ppo_trainer.step(query_tensors, response_tensors, rewards)
         elif config['summary_model_name'] == "google_pegasus_xsum":
-            ground_truth_sum_encoding = summary_tokenizer.batch_encode_plus(df_batch['summary'], return_tensors="pt",
-                                                                       truncation=True, padding="max_length", max_length=config["max_sum_token_len"])
-            ground_truth_sum_ids = ground_truth_sum_encoding['input_ids'].to(device)
-            _ = ppo_trainer.step(query_tensors, response_tensors, rewards, ground_truth_sum_ids)
+            _ = ppo_trainer.step(query_tensors, response_tensors, rewards, decoder_input_ids=response_tensors)
 
         timing['time/optimization'] = time.time() - t
 

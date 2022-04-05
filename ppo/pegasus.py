@@ -1,6 +1,7 @@
 from transformers import PegasusForConditionalGeneration
 from torch import nn
 from torch.nn import Identity
+import torch
 
 
 class ValueHead(nn.Module):
@@ -37,6 +38,7 @@ class ValueHead(nn.Module):
 
 class PegasusHeadWithValueModel(PegasusForConditionalGeneration):
     """The GPT2HeadWithValueModel class implements a GPT2 language model with a secondary, scalar head."""
+
     def __init__(self, config):
         super().__init__(config)
         config.num_labels = 1
@@ -54,23 +56,22 @@ class PegasusHeadWithValueModel(PegasusForConditionalGeneration):
         self.v_head.detach_head = True
 
     def forward(
-        self,
-        input_ids=None,
-        attention_mask=None,
-        decoder_input_ids=None,
-        decoder_attention_mask=None,
-        head_mask=None,
-        decoder_head_mask=None,
-        encoder_outputs=None,
-        past_key_values=None,
-        inputs_embeds=None,
-        decoder_inputs_embeds=None,
-        use_cache=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+            self,
+            input_ids=None,
+            attention_mask=None,
+            decoder_input_ids=None,
+            decoder_attention_mask=None,
+            head_mask=None,
+            decoder_head_mask=None,
+            encoder_outputs=None,
+            past_key_values=None,
+            inputs_embeds=None,
+            decoder_inputs_embeds=None,
+            use_cache=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            return_dict=None,
     ):
-
         transformer_outputs = self.transformer(
             input_ids=input_ids,
             decoder_input_ids=decoder_input_ids,
@@ -88,12 +89,14 @@ class PegasusHeadWithValueModel(PegasusForConditionalGeneration):
             return_dict=return_dict
         )
 
-        hidden_states = transformer_outputs.decoder_hidden_states[-1]
+        hidden_states = torch.cat(
+            [transformer_outputs.encoder_last_hidden_state, transformer_outputs.decoder_hidden_states[-1]], dim=1)
 
-        lm_logits = self.lm_head(hidden_states)
+        lm_logits = self.lm_head(transformer_outputs.encoder_last_hidden_state)
+        lm_logits = torch.cat([lm_logits, transformer_outputs.logits], dim=1)
         value = self.v_head(hidden_states).squeeze(-1)
 
         outputs = (lm_logits,) + (transformer_outputs.past_key_values, ) + (value,)
+        # outputs = (transformer_outputs.logits,) + (transformer_outputs.past_key_values,) + (value,)
 
         return outputs
-

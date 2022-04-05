@@ -135,7 +135,8 @@ class PPOTrainer:
 
         t = time.time()
         if decoder_input_ids is not None:
-            logprobs, ref_logprobs, values = self.batched_forward_pass(model_input, gen_len, decode_inputs=decoder_input_ids)
+            logprobs, ref_logprobs, values = self.batched_forward_pass(model_input, gen_len,
+                                                                       decode_inputs=decoder_input_ids)
         else:
             logprobs, ref_logprobs, values = self.batched_forward_pass(model_input, gen_len)
 
@@ -154,8 +155,8 @@ class PPOTrainer:
                 idx = idxs[i]
                 if decoder_input_ids is None:
                     train_stats = self.train_minibatch(logprobs[idx:idx + 1], values[idx:idx + 1],
-                                                   rewards[idx:idx + 1], query[idx:idx + 1],
-                                                   response[idx:idx + 1], model_input[idx:idx + 1])
+                                                       rewards[idx:idx + 1], query[idx:idx + 1],
+                                                       response[idx:idx + 1], model_input[idx:idx + 1])
                 else:
                     train_stats = self.train_minibatch(logprobs[idx:idx + 1], values[idx:idx + 1],
                                                        rewards[idx:idx + 1], query[idx:idx + 1],
@@ -209,7 +210,8 @@ class PPOTrainer:
 
     def train_minibatch(self, logprobs, values, rewards, query, response, model_input, decoder_input_ids=None):
         """Train one PPO minibatch"""
-        loss_p, loss_v, train_stats = self.loss(logprobs, values, rewards, query, response, model_input, decoder_input_ids)
+        loss_p, loss_v, train_stats = self.loss(logprobs, values, rewards, query, response, model_input,
+                                                decoder_input_ids)
         loss = loss_p + loss_v
         self.optimizer.zero_grad()
         loss.backward()
