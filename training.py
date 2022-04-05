@@ -37,7 +37,7 @@ print(device)
 
 if config['summary_model_name'] == "google_pegasus_xsum":
     summary_model = PegasusHeadWithValueModel.from_pretrained("google/pegasus-xsum").to(device)
-    summary_model_ref = PegasusForConditionalGeneration.from_pretrained("google/pegasus-xsum").to(device)
+    summary_model_ref = PegasusHeadWithValueModel.from_pretrained("google/pegasus-xsum").to(device)
     summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
 elif config['summary_model_name'] == "gpt2":
     summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
