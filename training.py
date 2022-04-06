@@ -1,6 +1,4 @@
 from transformers import (
-    AutoConfig,
-    PegasusForConditionalGeneration,
     PegasusTokenizer,
     GPT2Tokenizer,
     AutoTokenizer,
@@ -205,7 +203,8 @@ def main():
         df.to_pickle(x_sum_path)
 
     ppo_trainer = PPOTrainer(summary_model, summary_model_ref, **config)
-    for step_idx in tqdm(range(int(config['steps'] / config['batch_size']))):
+    for step_idx in range(int(config['steps'] / config['batch_size'])):
+        print(f"---------------training step {step_idx}---------------\n")
         torch.cuda.empty_cache()
         logs = dict()
         game_data = dict()

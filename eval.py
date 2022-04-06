@@ -6,6 +6,7 @@ from ppo.gpt2 import GPT2HeadWithValueModel
 from ppo.utils import respond_to_batch
 from datasets import load_dataset, load_dataset_builder
 from rouge_score import rouge_scorer
+from tqdm import tqdm
 
 batch_size = 2
 model_type = 'gpt2'
@@ -33,7 +34,7 @@ for me in measure:
     result[me] = {'precision': 0, 'recall': 0, 'f_measure': 0}
     result_ref[me] = {'precision': 0, 'recall': 0, 'f_measure': 0}
 
-for i in range(0, df.shape[0], batch_size):
+for i in tqdm(range(0, df.shape[0], batch_size)):
     df_batch = df.iloc[i:min(i+batch_size, df.shape[0])]
     encoding = summary_tokenizer.batch_encode_plus(df_batch['document'], return_tensors="pt", truncation=True, padding="max_length", max_length=max_token_len).to(device)
     response_ids = respond_to_batch(summary_model, encoding['input_ids'].to(device), txt_len=80, seq2seq=False)
