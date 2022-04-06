@@ -27,7 +27,7 @@ config = {
     "forward_batch_size": 2,
     "max_token_len": 512,
     "max_sum_token_len": 80,
-    "summary_model_name": "google_pegasus_xsum",
+    "summary_model_name": "gpt2",
 }
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -39,10 +39,9 @@ if config['summary_model_name'] == "google_pegasus_xsum":
     summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
 elif config['summary_model_name'] == "gpt2":
     summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    summary_model = GPT2HeadWithValueModel.from_pretrained(
-        pretrained_model_name_or_path="./finetuning/output/checkpoint-3500").to(device)
+    summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-101000").to(device)
     summary_model_ref = GPT2HeadWithValueModel.from_pretrained(
-        pretrained_model_name_or_path="./finetuning/output/checkpoint-3500").to(device)
+        pretrained_model_name_or_path="./finetuning/output/checkpoint-101000")
     # summary_model = GPT2HeadWithValueModel.from_pretrained("gpt2")
     # summary_model_ref = GPT2HeadWithValueModel.from_pretrained("gpt2")
 else:

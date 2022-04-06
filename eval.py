@@ -22,8 +22,8 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
 summary_tokenizer.pad_token = summary_tokenizer.eos_token
-summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-10000").to(device)
-summary_model_ref = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-10000").to(device)
+summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-101000").to(device)
+summary_model_ref = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-50500").to(device)
 
 measure = ['rouge1', 'rouge2', 'rougeL']
 scorer = rouge_scorer.RougeScorer(measure)
@@ -37,8 +37,8 @@ for me in measure:
 for i in tqdm(range(0, df.shape[0], batch_size)):
     df_batch = df.iloc[i:min(i+batch_size, df.shape[0])]
     encoding = summary_tokenizer.batch_encode_plus(df_batch['document'], return_tensors="pt", truncation=True, padding="max_length", max_length=max_token_len).to(device)
-    response_ids = respond_to_batch(summary_model, encoding['input_ids'].to(device), txt_len=80, seq2seq=False)
-    response_ids_ref = respond_to_batch(summary_model_ref, encoding['input_ids'].to(device), txt_len=80, seq2seq=False)
+    response_ids = respond_to_batch(summary_model, encoding['input_ids'].to(device), txt_len=80)
+    response_ids_ref = respond_to_batch(summary_model_ref, encoding['input_ids'].to(device), txt_len=80)
 
     response = summary_tokenizer.batch_decode(response_ids)
     response_ref = summary_tokenizer.batch_decode(response_ids_ref)
