@@ -33,7 +33,7 @@ config = {
 }
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-print(device)
+print(f"--------------Detected device {device}--------------\n")
 
 if config['summary_model_name'] == "google_pegasus_xsum":
     summary_model = PegasusHeadWithValueModel.from_pretrained("google/pegasus-xsum").to(device)
@@ -68,6 +68,7 @@ def prepare_data():
 
 def gen_answer(questions, context):
     batch_question_context = []
+    print(f"******************gen-answer******************\nquestion: {questions} \n context: {context}\n")
 
     for question in questions:
         if question.strip() == '':
@@ -77,7 +78,6 @@ def gen_answer(questions, context):
     str_questions = "\n".join(questions)
     if str_questions.strip() == '':
         return []
-    print(f"******************gen-answer******************\n{batch_question_context}\n\n")
     encoding = gen_answer_tokenizer.batch_encode_plus(batch_question_context, padding=True, return_tensors="pt")
     input_ids, attention_mask = encoding["input_ids"].to(device), encoding["attention_mask"].to(device)
     outputs = gen_answer_model(input_ids, attention_mask=attention_mask)
@@ -92,7 +92,7 @@ def gen_answer(questions, context):
         answer_tokens_string = gen_answer_tokenizer.convert_tokens_to_string(answer_tokens)
         answers.append(answer_tokens_string)
 
-    print(f"{answers}\n-------------------------")
+    print(f"answer: {answers}\n-------------------------\n")
     return answers
 
 
@@ -122,6 +122,7 @@ def get_question_answer_pair(qa_g_a, qa_g_t):
 
 
 def norm_levenshtein(seq1, seq2):
+    print(f"******************compute reward******************\n{seq1} \nvs\n {seq2}\n")
     size_x = len(seq1) + 1
     size_y = len(seq2) + 1
     matrix = np.zeros((size_x, size_y))
@@ -193,10 +194,10 @@ def main():
 
     x_sum_path = f"./datasets/x_sum_{config['summary_model_name']}.pkl"
     if os.path.exists(x_sum_path):
-        print("load dataset")
+        print("---------->>>>>>>>>>>> prepared load dataset\n")
         df = pd.read_pickle(x_sum_path)
     else:
-        print("prepare dataset")
+        print("prepare dataset ---------->>>>>>>>>>>>\n")
         df = prepare_data()
         # TODO increase length of tokens
         df = df.progress_apply(tokenize_document, axis=1)
