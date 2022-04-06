@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-#SBATCH --job-name=qa_training
-#SBATCH --output=qa_training_output.txt
+#SBATCH --job-name=qa_eval
+#SBATCH --output=qa_eval_output.txt
 #SBATCH --ntasks=1
 #SBATCH --partition=students
 #SBATCH --time=1-0:00:00
