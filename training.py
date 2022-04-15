@@ -39,9 +39,10 @@ if config['summary_model_name'] == "google_pegasus_xsum":
     summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
 elif config['summary_model_name'] == "gpt2":
     summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path="./finetuning/output/checkpoint-101000").to(device)
+    summary_model = GPT2HeadWithValueModel.from_pretrained(
+        pretrained_model_name_or_path="./finetuning/output/checkpoint-last").to(device)
     summary_model_ref = GPT2HeadWithValueModel.from_pretrained(
-        pretrained_model_name_or_path="./finetuning/output/checkpoint-101000")
+        pretrained_model_name_or_path="./finetuning/output/checkpoint-last").to(device)
     # summary_model = GPT2HeadWithValueModel.from_pretrained("gpt2")
     # summary_model_ref = GPT2HeadWithValueModel.from_pretrained("gpt2")
 else:
@@ -49,7 +50,7 @@ else:
 summary_tokenizer.pad_token = summary_tokenizer.eos_token
 
 qa_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-base-qg-hl")
-qa_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-base-qg-hl").to(device)
+qa_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-base-qg-hl")
 ans_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-small-qa-qg-hl")
 ans_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-small-qa-qg-hl").to(device)
 gen_answer_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-cased-distilled-squad")
@@ -103,7 +104,7 @@ def get_question_answer_pair(qa_g_a, qa_g_t):
         a_g_a = []
         for qa in g_qa:
             q_g_a.append(qa['question'])
-            a_g_a.append(qa['answer'])
+            a_g_a.append(qa['answer'].replace("<pad>", "").strip())
         l_q_g_a.append(q_g_a)
         l_a_g_a.append(a_g_a)
 
@@ -111,7 +112,7 @@ def get_question_answer_pair(qa_g_a, qa_g_t):
         a_g_t = []
         for qa in t_qa:
             q_g_t.append(qa['question'])
-            a_g_t.append(qa['answer'])
+            a_g_t.append(qa['answer'].replace("<pad>", "").strip())
         l_q_g_t.append(q_g_t)
         l_a_g_t.append(a_g_t)
 
@@ -148,7 +149,12 @@ def norm_levenshtein(seq1, seq2):
 def reward_calculation(generated_summaries, ground_truth_summaries):
     qa_gen = QAGeneration(model=qa_model, tokenizer=qa_tokenizer, ans_model=ans_model, ans_tokenizer=ans_tokenizer)
 
-    qa_g_a = [qa_gen(gen_sum) for gen_sum in generated_summaries]
+    qa_g_a = []
+    for gen_sum in generated_summaries:
+        if len(gen_sum) >= 5:
+            qa_g_a.append(qa_gen(gen_sum))
+        else:
+            qa_g_a.append([])
     qa_g_t = [qa_gen(truth_sum) for truth_sum in ground_truth_summaries]
 
     l_q_g_a, l_a_g_a, l_q_g_t, l_a_g_t = get_question_answer_pair(qa_g_a, qa_g_t)
@@ -204,7 +210,7 @@ def main():
     ppo_trainer = PPOTrainer(summary_model, summary_model_ref, **config)
     for step_idx in range(int(config['steps'] / config['batch_size'])):
         print(f"---------------training step {step_idx}---------------\n")
-        torch.cuda.empty_cache()
+        # torch.cuda.empty_cache()
         logs = dict()
         game_data = dict()
         timing = dict()

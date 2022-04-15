@@ -10,4 +10,6 @@
 #SBATCH --mail-user=anhtu@cl.uni-heidelberg.de
 #SBATCH --mail-type=ALL
 
-srun /home/students/anhtu/qa-rewards-abstractive-summarization/run_eval.sh
+source /home/students/anhtu/qa-rewards-abstractive-summarization/venv/bin/activate
+python /home/students/anhtu/qa-rewards-abstractive-summarization/eval.py
+deactivate

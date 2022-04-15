@@ -9,6 +9,6 @@ sentencepiece==0.1.96
 tokenizers==0.10.3
 torch==1.10.2
 tqdm==4.63.0
-transformers==4.3.2
+transformers==4.18.0
 scikit-learn==1.0.2
 wandb==0.10.20

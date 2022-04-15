@@ -1,5 +1,5 @@
 # dataset
-finetuning/output/*
+finetuning/output*
 datasets/*
 
 # output files

@@ -4,10 +4,12 @@
 #SBATCH --output=qa_training_output.txt
 #SBATCH --ntasks=1
 #SBATCH --partition=students
-#SBATCH --time=1-0:00:00
-#SBATCH --gres=gpu:mem11g:2
+#SBATCH --time=6:00:00
+#SBATCH --gres=gpu:mem11g:1
 #SBATCH --mem=32000
 #SBATCH --mail-user=anhtu@cl.uni-heidelberg.de
 #SBATCH --mail-type=ALL
 
-srun /home/students/anhtu/qa-rewards-abstractive-summarization/run.sh
+source /home/students/anhtu/qa-rewards-abstractive-summarization/venv/bin/activate
+python /home/students/anhtu/qa-rewards-abstractive-summarization/training.py
+deactivate
