@@ -1,3 +1,10 @@
+import os
+import time
+
+import numpy as np
+import pandas as pd
+import torch
+from tqdm import tqdm
 from transformers import (
     PegasusTokenizer,
     GPT2Tokenizer,
@@ -5,18 +12,12 @@ from transformers import (
     AutoModelForQuestionAnswering,
     AutoModelForSeq2SeqLM,
 )
-from datasets import load_dataset
-import torch
-from ppo.ppo import PPOTrainer
-from ppo.gpt2 import GPT2HeadWithValueModel
-from ppo.utils import respond_to_batch
-from ppo.pegasus import PegasusHeadWithValueModel
-import pandas as pd
-import numpy as np
-from tqdm import tqdm
-import time
-import os
 
+from datasets import load_dataset
+from ppo.gpt2 import GPT2HeadWithValueModel
+from ppo.pegasus import PegasusHeadWithValueModel
+from ppo.ppo import PPOTrainer
+from ppo.utils import respond_to_batch
 from qa_generation import QAGeneration
 
 tqdm.pandas()
@@ -29,6 +30,7 @@ config = {
     "max_sum_token_len": 80,
     "summary_model_name": "gpt2",
 }
+checkpoint_idx = 80
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"--------------Detected device {device}--------------\n")
@@ -40,9 +42,11 @@ if config['summary_model_name'] == "google_pegasus_xsum":
 elif config['summary_model_name'] == "gpt2":
     summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     summary_model = GPT2HeadWithValueModel.from_pretrained(
-        pretrained_model_name_or_path="./finetuning/output/checkpoint-last").to(device)
+        pretrained_model_name_or_path=f"./checkpoint/checkpoint-{checkpoint_idx}").to(
+        device)
     summary_model_ref = GPT2HeadWithValueModel.from_pretrained(
-        pretrained_model_name_or_path="./finetuning/output/checkpoint-last").to(device)
+        pretrained_model_name_or_path="./finetuning/output/checkpoint-last").to(
+        device)
     # summary_model = GPT2HeadWithValueModel.from_pretrained("gpt2")
     # summary_model_ref = GPT2HeadWithValueModel.from_pretrained("gpt2")
 else:
@@ -120,7 +124,7 @@ def get_question_answer_pair(qa_g_a, qa_g_t):
 
 
 def norm_levenshtein(seq1, seq2):
-    print(f"******************compute reward******************\n{seq1} \nvs\n {seq2}\n")
+    print(f"******************compute reward******************\n{seq1} \nvs\n{seq2}\n")
     size_x = len(seq1) + 1
     size_y = len(seq2) + 1
     matrix = np.zeros((size_x, size_y))
@@ -143,7 +147,9 @@ def norm_levenshtein(seq1, seq2):
                     matrix[x - 1, y - 1] + 1,
                     matrix[x, y - 1] + 1
                 )
-    return (matrix[size_x - 1, size_y - 1]) / max(len(seq1), len(seq2))
+    reward = 1 - (matrix[size_x - 1, size_y - 1]) / max(len(seq1), len(seq2))
+    print(f"===>>>> reward = {reward}\n")
+    return reward
 
 
 def reward_calculation(generated_summaries, ground_truth_summaries):
@@ -155,6 +161,7 @@ def reward_calculation(generated_summaries, ground_truth_summaries):
             qa_g_a.append(qa_gen(gen_sum))
         else:
             qa_g_a.append([])
+
     qa_g_t = [qa_gen(truth_sum) for truth_sum in ground_truth_summaries]
 
     l_q_g_a, l_a_g_a, l_q_g_t, l_a_g_t = get_question_answer_pair(qa_g_a, qa_g_t)
@@ -192,12 +199,12 @@ def tokenize_document(row):
 def main():
     if not os.path.exists("./datasets"):
         os.makedirs("./datasets")
-    if not os.path.exists("./checkpoint"):
-        os.makedirs("./checkpoint")
+    # if not os.path.exists("./checkpoint"):
+    #     os.makedirs("./checkpoint")
 
     x_sum_path = f"./datasets/x_sum_{config['summary_model_name']}.pkl"
     if os.path.exists(x_sum_path):
-        print("---------->>>>>>>>>>>> prepared load dataset\n")
+        print("---------->>>>>>>>>>>> load prepared dataset\n")
         df = pd.read_pickle(x_sum_path)
     else:
         print("prepare dataset ---------->>>>>>>>>>>>\n")
@@ -208,9 +215,9 @@ def main():
         df.to_pickle(x_sum_path)
 
     ppo_trainer = PPOTrainer(summary_model, summary_model_ref, **config)
-    for step_idx in range(int(config['steps'] / config['batch_size'])):
-        print(f"---------------training step {step_idx}---------------\n")
-        # torch.cuda.empty_cache()
+    for step_idx in range(checkpoint_idx + 1, int(config['steps'] / config['batch_size'])):
+        print(f"\n\n---------------training step {step_idx}---------------\n")
+        torch.cuda.empty_cache()
         logs = dict()
         game_data = dict()
         timing = dict()
@@ -241,8 +248,10 @@ def main():
             response_tensors.append(response)
 
         response_tensors = torch.cat(response_tensors).to(device)
-        game_data['response'] = [summary_tokenizer.decode(response_tensors[i, :]) for i in range(config['batch_size'])]
-        print(f"******************game_data['response']******************\n{game_data['response']}\n")
+        game_data['response'] = [summary_tokenizer.decode(response_tensors[i, :]).strip() for i in
+                                 range(config['batch_size'])]
+        print_game_data = '\n->'.join(game_data['response'])
+        print(f"******************game_data['response']******************\n{print_game_data}\n")
         timing['time/get_response'] = time.time() - t
 
         t = time.time()
@@ -263,8 +272,9 @@ def main():
         logs['env/reward_mean'] = torch.mean(rewards)
         logs['env/reward_std'] = torch.std(rewards).cpu().numpy()
         print(str(logs))
-        if step_idx != 0 and step_idx % 500 == 0:
-            summary_model.save_pretrained(f"./checkpoint/checkpoint-{step_idx}")
+        if step_idx != 0 and step_idx % 20 == 0:
+            summary_model.save_pretrained(
+                f"./checkpoint/checkpoint-{step_idx}")
 
 
 if __name__ == "__main__":
