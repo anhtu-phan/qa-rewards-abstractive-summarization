@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch
 
 
-def respond_to_batch(model, queries, txt_len=20, top_k=0, top_p=1.0, eos_token=None, device="cpu"):
+def respond_to_batch(model, queries, txt_len=20, top_k=0, top_p=0.95, eos_token=None, device="cpu"):
     """Sample text from language model."""
     input_ids = queries
     # input_ids = [batch_size, src_len]

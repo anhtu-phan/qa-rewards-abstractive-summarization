@@ -26,11 +26,11 @@ config = {
     "batch_size": 4,
     "steps": 100000,
     "forward_batch_size": 2,
-    "max_token_len": 512,
-    "max_sum_token_len": 80,
+    "max_token_len": 128,
+    "max_sum_token_len": 60,
     "summary_model_name": "gpt2",
 }
-checkpoint_idx = 80
+checkpoint_idx = 0
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"--------------Detected device {device}--------------\n")
@@ -42,7 +42,7 @@ if config['summary_model_name'] == "google_pegasus_xsum":
 elif config['summary_model_name'] == "gpt2":
     summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
     summary_model = GPT2HeadWithValueModel.from_pretrained(
-        pretrained_model_name_or_path=f"./checkpoint/checkpoint-{checkpoint_idx}").to(
+        pretrained_model_name_or_path="./finetuning/output/checkpoint-last").to(
         device)
     summary_model_ref = GPT2HeadWithValueModel.from_pretrained(
         pretrained_model_name_or_path="./finetuning/output/checkpoint-last").to(
@@ -189,6 +189,8 @@ def reward_calculation(generated_summaries, ground_truth_summaries):
 
 
 def tokenize_document(row):
+    if len(row['document'].split(" ")) < config['max_token_len']:
+        return None
     encoding = summary_tokenizer.encode_plus(row['document'], return_tensors="pt", truncation=True,
                                              padding="max_length", max_length=config['max_token_len']).to(device)
     row['tokens'] = encoding["input_ids"][0, :]
@@ -211,6 +213,7 @@ def main():
         df = prepare_data()
         # TODO increase length of tokens
         df = df.progress_apply(tokenize_document, axis=1)
+        df = df.dropna()
         df['query'] = df['tokens'].progress_apply(lambda x: summary_tokenizer.decode(x))
         df.to_pickle(x_sum_path)
 
@@ -225,6 +228,7 @@ def main():
 
         df_batch = df.sample(config['batch_size'])
         game_data['query'] = df_batch['query'].tolist()
+        # TODO: padding -> end of text
         query_tensors = torch.stack(df_batch['tokens'].tolist()).to(device)
         ground_truth_sum = df_batch['summary'].tolist()
         t = time.time()
@@ -272,7 +276,7 @@ def main():
         logs['env/reward_mean'] = torch.mean(rewards)
         logs['env/reward_std'] = torch.std(rewards).cpu().numpy()
         print(str(logs))
-        if step_idx != 0 and step_idx % 20 == 0:
+        if step_idx != 0 and step_idx % 200 == 0:
             summary_model.save_pretrained(
                 f"./checkpoint/checkpoint-{step_idx}")
 
