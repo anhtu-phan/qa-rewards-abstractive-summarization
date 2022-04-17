@@ -9,4 +9,4 @@
 #SBATCH --mail-user=anhtu@cl.uni-heidelberg.de
 #SBATCH --mail-type=ALL
 
-srun /home/students/anhtu/qa-rewards-abstractive-summarization/run_training.sh
+srun /home/students/anhtu/qa-rewards-abstractive-summarization/bash/run_training.sh

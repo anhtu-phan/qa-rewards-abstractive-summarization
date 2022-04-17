@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [-d "/home/students/anhtu/qa-rewards-abstractive-summarization/venv/" ]; then
+if [ -d "/home/students/anhtu/qa-rewards-abstractive-summarization/venv/" ]; then
   source /home/students/anhtu/qa-rewards-abstractive-summarization/venv/bin/activate
 else
   python3 -m venv /home/students/anhtu/qa-rewards-abstractive-summarization/venv
