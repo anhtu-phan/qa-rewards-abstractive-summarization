@@ -1,0 +1,22 @@
+#app {
+	padding: 20px;
+}
+
+#upload_doc{
+	width: 100%;
+	height: 200px;
+	overflow-y: scroll;
+	margin-bottom: 10px;
+}
+
+table {
+  font-family: arial, sans-serif;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+td, th {
+  border: 1px solid #dddddd;
+  text-align: left;
+  padding: 8px;
+}

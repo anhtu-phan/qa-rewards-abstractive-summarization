@@ -1,0 +1,38 @@
+<!doctype! html>
+<html>
+	<head>
+		<title>Abstractive Summarization Using Question Answering Rewards</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+		<link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" type="text/css">
+		<link rel="stylesheet" href="/static/css/app.css" type="text/css">
+	</head>
+	<body>
+		<div id="app">
+			<div>
+				<form id="upload-form" method="post" enctype="multipart/form-data">
+					<h5>Abstractive Summarization Using Question Answering Rewards</h5>
+					<div class="form-content-container">
+						<textarea id="upload_doc" type="text" name="input_doc"></textarea>
+						<br>
+						<input id="upload_button" type="submit" value="Submit" />
+					</div>
+				</form>
+			</div>
+			<hr>
+			<div id="result">
+				<table>
+					<tr>
+						<th>Original Model</th>
+						<th>Training with QA</th>
+					</tr>
+					{% if model_result %}
+					<tr>
+						<td>{{ model_result }}</td>
+						<td>{{ model_ref_result }}</td>
+					</tr>
+					{% endif %}
+				</table>
+			</div>
+		</div>
+	</body>
+</html>
