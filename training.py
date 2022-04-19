@@ -41,9 +41,13 @@ if config['summary_model_name'] == "google_pegasus_xsum":
     summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
 elif config['summary_model_name'] == "gpt2":
     summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    summary_model = GPT2HeadWithValueModel.from_pretrained(
-        pretrained_model_name_or_path="./finetuning/output/checkpoint-last").to(
-        device)
+    if checkpoint_idx == 0:
+        summary_model = GPT2HeadWithValueModel.from_pretrained(
+            pretrained_model_name_or_path="./finetuning/output/checkpoint-last").to(device)
+    else:
+        summary_model = GPT2HeadWithValueModel.from_pretrained(
+            pretrained_model_name_or_path=f"./checkpoint/checkpoint-{checkpoint_idx}").to(device)
+
     summary_model_ref = GPT2HeadWithValueModel.from_pretrained(
         pretrained_model_name_or_path="./finetuning/output/checkpoint-last").to(
         device)
@@ -51,7 +55,7 @@ elif config['summary_model_name'] == "gpt2":
     # summary_model_ref = GPT2HeadWithValueModel.from_pretrained("gpt2")
 else:
     raise NotImplementedError
-summary_tokenizer.pad_token = summary_tokenizer.eos_token
+summary_tokenizer.pad_token = " "
 
 qa_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-base-qg-hl")
 qa_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-base-qg-hl")
@@ -189,8 +193,8 @@ def reward_calculation(generated_summaries, ground_truth_summaries):
 
 
 def tokenize_document(row):
-    if len(row['document'].split(" ")) < config['max_token_len']:
-        return None
+    # if len(row['document'].split(" ")) < config['max_token_len']:
+    #     return None
     encoding = summary_tokenizer.encode_plus(row['document'], return_tensors="pt", truncation=True,
                                              padding="max_length", max_length=config['max_token_len']).to(device)
     row['tokens'] = encoding["input_ids"][0, :]
@@ -213,7 +217,7 @@ def main():
         df = prepare_data()
         # TODO increase length of tokens
         df = df.progress_apply(tokenize_document, axis=1)
-        df = df.dropna()
+        # df = df.dropna()
         df['query'] = df['tokens'].progress_apply(lambda x: summary_tokenizer.decode(x))
         df.to_pickle(x_sum_path)
 
@@ -225,8 +229,11 @@ def main():
         game_data = dict()
         timing = dict()
         t0 = time.time()
-
-        df_batch = df.sample(config['batch_size'])
+        if step_idx*config['batch_size'] > df.shape[0]:
+            df_batch = df.sample(config['batch_size'])
+        else:
+            df_batch = df.iloc[(step_idx-1)*config['batch_size']: min(step_idx*config['batch_size'], df.shape[0])]
+        print(df_batch.index)
         game_data['query'] = df_batch['query'].tolist()
         # TODO: padding -> end of text
         query_tensors = torch.stack(df_batch['tokens'].tolist()).to(device)
@@ -264,18 +271,20 @@ def main():
 
         t = time.time()
         if config['summary_model_name'] == "gpt2":
-            _ = ppo_trainer.step(query_tensors, response_tensors, rewards)
+            stats = ppo_trainer.step(query_tensors, response_tensors, rewards)
         elif config['summary_model_name'] == "google_pegasus_xsum":
-            _ = ppo_trainer.step(query_tensors, response_tensors, rewards, decoder_input_ids=response_tensors)
+            stats = ppo_trainer.step(query_tensors, response_tensors, rewards, decoder_input_ids=response_tensors)
 
         timing['time/optimization'] = time.time() - t
 
         timing['time/epoch'] = time.time() - t0
-        print(str(timing))
 
         logs['env/reward_mean'] = torch.mean(rewards)
         logs['env/reward_std'] = torch.std(rewards).cpu().numpy()
+        logs.update(timing)
+        logs.update(stats)
         print(str(logs))
+
         if step_idx != 0 and step_idx % 200 == 0:
             summary_model.save_pretrained(
                 f"./checkpoint/checkpoint-{step_idx}")
