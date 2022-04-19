@@ -1,8 +1,9 @@
 # qa-rewards-abstractive-summarization
+![Training Framework architecture](https://imgur.com/fyK8wAG)
 
-##How to run 
+## How to run 
 
-###Install 
+### Install 
 
     #python3.7
     pip install --upgrade pip
