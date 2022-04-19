@@ -1,5 +1,6 @@
 import os
 import time
+import argparse
 
 import numpy as np
 import pandas as pd
@@ -12,8 +13,9 @@ from transformers import (
     AutoModelForQuestionAnswering,
     AutoModelForSeq2SeqLM,
 )
-
 from datasets import load_dataset
+import wandb
+
 from ppo.gpt2 import GPT2HeadWithValueModel
 from ppo.pegasus import PegasusHeadWithValueModel
 from ppo.ppo import PPOTrainer
@@ -30,29 +32,29 @@ config = {
     "max_sum_token_len": 60,
     "summary_model_name": "gpt2",
 }
+
+wandb_run_name = f'run-{config["summary_model_name"]}'
+wandb.init(name=wandb_run_name, project='qa-summarization', config=config, resume=True)
+
 checkpoint_idx = 0
+pretrained_model_path = "gpt2"
+if checkpoint_idx == 0:
+    model_path = pretrained_model_path
+else:
+    model_path = f"./checkpoint/checkpoint-{checkpoint_idx}"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"--------------Detected device {device}--------------\n")
 
 if config['summary_model_name'] == "google_pegasus_xsum":
-    summary_model = PegasusHeadWithValueModel.from_pretrained("google/pegasus-xsum").to(device)
-    summary_model_ref = PegasusHeadWithValueModel.from_pretrained("google/pegasus-xsum").to(device)
+    summary_model = PegasusHeadWithValueModel.from_pretrained(model_path).to(device)
+    summary_model_ref = PegasusHeadWithValueModel.from_pretrained(pretrained_model_path).to(device)
     summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
 elif config['summary_model_name'] == "gpt2":
     summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    if checkpoint_idx == 0:
-        summary_model = GPT2HeadWithValueModel.from_pretrained(
-            pretrained_model_name_or_path="./finetuning/output/checkpoint-last").to(device)
-    else:
-        summary_model = GPT2HeadWithValueModel.from_pretrained(
-            pretrained_model_name_or_path=f"./checkpoint/checkpoint-{checkpoint_idx}").to(device)
-
-    summary_model_ref = GPT2HeadWithValueModel.from_pretrained(
-        pretrained_model_name_or_path="./finetuning/output/checkpoint-last").to(
+    summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path=model_path).to(device)
+    summary_model_ref = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path=pretrained_model_path).to(
         device)
-    # summary_model = GPT2HeadWithValueModel.from_pretrained("gpt2")
-    # summary_model_ref = GPT2HeadWithValueModel.from_pretrained("gpt2")
 else:
     raise NotImplementedError
 summary_tokenizer.pad_token = " "
@@ -64,6 +66,8 @@ ans_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-small-qa-qg-hl").
 gen_answer_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-cased-distilled-squad")
 gen_answer_model = AutoModelForQuestionAnswering.from_pretrained("distilbert-base-cased-distilled-squad").to(device)
 
+wandb.watch(summary_model, log='all')
+
 
 def prepare_data():
     ds = load_dataset("xsum", split="train")
@@ -74,7 +78,6 @@ def prepare_data():
 
 def gen_answer(questions, context):
     batch_question_context = []
-    print(f"******************gen-answer******************\nquestion: {questions} \n context: {context}\n")
 
     for question in questions:
         if question.strip() == '':
@@ -98,7 +101,6 @@ def gen_answer(questions, context):
         answer_tokens_string = gen_answer_tokenizer.convert_tokens_to_string(answer_tokens)
         answers.append(answer_tokens_string)
 
-    print(f"answer: {answers}\n-------------------------\n")
     return answers
 
 
@@ -128,7 +130,6 @@ def get_question_answer_pair(qa_g_a, qa_g_t):
 
 
 def norm_levenshtein(seq1, seq2):
-    print(f"******************compute reward******************\n{seq1} \nvs\n{seq2}\n")
     size_x = len(seq1) + 1
     size_y = len(seq2) + 1
     matrix = np.zeros((size_x, size_y))
@@ -152,7 +153,6 @@ def norm_levenshtein(seq1, seq2):
                     matrix[x, y - 1] + 1
                 )
     reward = 1 - (matrix[size_x - 1, size_y - 1]) / max(len(seq1), len(seq2))
-    print(f"===>>>> reward = {reward}\n")
     return reward
 
 
@@ -193,8 +193,6 @@ def reward_calculation(generated_summaries, ground_truth_summaries):
 
 
 def tokenize_document(row):
-    # if len(row['document'].split(" ")) < config['max_token_len']:
-    #     return None
     encoding = summary_tokenizer.encode_plus(row['document'], return_tensors="pt", truncation=True,
                                              padding="max_length", max_length=config['max_token_len']).to(device)
     row['tokens'] = encoding["input_ids"][0, :]
@@ -205,8 +203,8 @@ def tokenize_document(row):
 def main():
     if not os.path.exists("./datasets"):
         os.makedirs("./datasets")
-    # if not os.path.exists("./checkpoint"):
-    #     os.makedirs("./checkpoint")
+    if not os.path.exists("./checkpoint"):
+        os.makedirs("./checkpoint")
 
     x_sum_path = f"./datasets/x_sum_{config['summary_model_name']}.pkl"
     if os.path.exists(x_sum_path):
@@ -215,27 +213,25 @@ def main():
     else:
         print("prepare dataset ---------->>>>>>>>>>>>\n")
         df = prepare_data()
-        # TODO increase length of tokens
         df = df.progress_apply(tokenize_document, axis=1)
-        # df = df.dropna()
         df['query'] = df['tokens'].progress_apply(lambda x: summary_tokenizer.decode(x))
         df.to_pickle(x_sum_path)
 
     ppo_trainer = PPOTrainer(summary_model, summary_model_ref, **config)
-    for step_idx in range(checkpoint_idx + 1, int(config['steps'] / config['batch_size'])):
-        print(f"\n\n---------------training step {step_idx}---------------\n")
+    for step_idx in tqdm(range(checkpoint_idx + 1, int(config['steps'] / config['batch_size']))):
         torch.cuda.empty_cache()
         logs = dict()
         game_data = dict()
         timing = dict()
         t0 = time.time()
-        if step_idx*config['batch_size'] > df.shape[0]:
+
+        if step_idx * config['batch_size'] > df.shape[0]:
             df_batch = df.sample(config['batch_size'])
         else:
-            df_batch = df.iloc[(step_idx-1)*config['batch_size']: min(step_idx*config['batch_size'], df.shape[0])]
-        print(df_batch.index)
+            df_batch = df.iloc[(step_idx - 1) * config['batch_size']: min(step_idx * config['batch_size'], df.shape[0])]
+
         game_data['query'] = df_batch['query'].tolist()
-        # TODO: padding -> end of text
+
         query_tensors = torch.stack(df_batch['tokens'].tolist()).to(device)
         ground_truth_sum = df_batch['summary'].tolist()
         t = time.time()
@@ -261,8 +257,7 @@ def main():
         response_tensors = torch.cat(response_tensors).to(device)
         game_data['response'] = [summary_tokenizer.decode(response_tensors[i, :]).strip() for i in
                                  range(config['batch_size'])]
-        print_game_data = '\n->'.join(game_data['response'])
-        print(f"******************game_data['response']******************\n{print_game_data}\n")
+
         timing['time/get_response'] = time.time() - t
 
         t = time.time()
@@ -276,19 +271,33 @@ def main():
             stats = ppo_trainer.step(query_tensors, response_tensors, rewards, decoder_input_ids=response_tensors)
 
         timing['time/optimization'] = time.time() - t
-
         timing['time/epoch'] = time.time() - t0
-
-        logs['env/reward_mean'] = torch.mean(rewards)
-        logs['env/reward_std'] = torch.std(rewards).cpu().numpy()
-        logs.update(timing)
-        logs.update(stats)
-        print(str(logs))
-
-        if step_idx != 0 and step_idx % 200 == 0:
+        if step_idx != 0 and step_idx % 100 == 0:
             summary_model.save_pretrained(
                 f"./checkpoint/checkpoint-{step_idx}")
 
+        table_rows = [list(r) for r in zip(game_data['query'], game_data['response'], rewards.cpu().tolist())]
+        logs.update({'game_log': wandb.Table(
+            columns=['query', 'response', 'reward'],
+            rows=table_rows)})
+
+        logs.update(timing)
+        logs.update(stats)
+        logs['env/reward_mean'] = torch.mean(rewards)
+        logs['env/reward_std'] = torch.std(rewards).cpu().numpy()
+        logs['env/reward_dist'] = rewards.cpu().numpy()
+
+        wandb.log(logs, step=step_idx)
+
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Abstractive Summarization using Question Answering Rewards Training")
+    parser.add_argument("--pretrained_model_path", type=str)
+    parser.add_argument("--summary_model_name", type=str)
+
+    args = parser.parse_args()
+    pretrained_model_path = args.pretrained_model_path
+    config['summary_model_name'] = args.summary_model_name
+
     main()

@@ -297,9 +297,9 @@ class PPOTrainer:
         mean_non_score_reward = torch.mean(torch.sum(data['non_score_reward'], axis=1))
         stats = {
             'objective/kl': mean_kl,
-            # 'objective/kl_dist': kl,
-            # 'objective/logprobs': data['logprobs'],
-            # 'objective/ref_logprobs': data['ref_logprobs'],
+            'objective/kl_dist': kl,
+            'objective/logprobs': data['logprobs'],
+            'objective/ref_logprobs': data['ref_logprobs'],
             'objective/kl_coef': kl_coef,
             'objective/entropy': mean_entropy,
             'ppo/mean_non_score_reward': mean_non_score_reward,

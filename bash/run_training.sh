@@ -5,7 +5,7 @@ if [ -d "/home/students/anhtu/qa-rewards-abstractive-summarization/venv/" ]; the
 else
   python3 -m venv /home/students/anhtu/qa-rewards-abstractive-summarization/venv
   source /home/students/anhtu/qa-rewards-abstractive-summarization/venv/bin/activate
-  pip install -r /home/students/anhtu/qa-rewards-abstractive-summarization/requirements_2.txt
+  pip install -r /home/students/anhtu/qa-rewards-abstractive-summarization/requirements.txt
 fi
-python /home/students/anhtu/qa-rewards-abstractive-summarization/training.py
+python /home/students/anhtu/qa-rewards-abstractive-summarization/training.py --pretrained_model_path "./finetuning/output/checkpoint-last" --summary_model_name "gpt2"
 deactivate
