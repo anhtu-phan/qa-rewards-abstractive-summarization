@@ -24,50 +24,6 @@ from qa_generation import QAGeneration
 
 tqdm.pandas()
 
-config = {
-    "batch_size": 4,
-    "steps": 100000,
-    "forward_batch_size": 2,
-    "max_token_len": 128,
-    "max_sum_token_len": 60,
-    "summary_model_name": "gpt2",
-}
-
-wandb_run_name = f'run-{config["summary_model_name"]}'
-wandb.init(name=wandb_run_name, project='qa-summarization', config=config, resume=True)
-
-checkpoint_idx = 0
-pretrained_model_path = "gpt2"
-if checkpoint_idx == 0:
-    model_path = pretrained_model_path
-else:
-    model_path = f"./checkpoint/checkpoint-{checkpoint_idx}"
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"--------------Detected device {device}--------------\n")
-
-if config['summary_model_name'] == "google_pegasus_xsum":
-    summary_model = PegasusHeadWithValueModel.from_pretrained(model_path).to(device)
-    summary_model_ref = PegasusHeadWithValueModel.from_pretrained(pretrained_model_path).to(device)
-    summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
-elif config['summary_model_name'] == "gpt2":
-    summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path=model_path).to(device)
-    summary_model_ref = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path=pretrained_model_path).to(
-        device)
-else:
-    raise NotImplementedError
-summary_tokenizer.pad_token = " "
-
-qa_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-base-qg-hl")
-qa_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-base-qg-hl")
-ans_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-small-qa-qg-hl")
-ans_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-small-qa-qg-hl").to(device)
-gen_answer_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-cased-distilled-squad")
-gen_answer_model = AutoModelForQuestionAnswering.from_pretrained("distilbert-base-cased-distilled-squad").to(device)
-
-wandb.watch(summary_model, log='all')
-
 
 def prepare_data():
     ds = load_dataset("xsum", split="train")
@@ -297,7 +253,52 @@ if __name__ == "__main__":
     parser.add_argument("--summary_model_name", type=str)
 
     args = parser.parse_args()
+
+    config = {
+        "batch_size": 4,
+        "steps": 100000,
+        "forward_batch_size": 2,
+        "max_token_len": 128,
+        "max_sum_token_len": 60,
+        "summary_model_name": "gpt2",
+    }
+
     pretrained_model_path = args.pretrained_model_path
     config['summary_model_name'] = args.summary_model_name
+
+    wandb_run_name = f'run-{config["summary_model_name"]}'
+    wandb.init(name=wandb_run_name, project='qa-summarization', config=config, resume=True)
+
+    checkpoint_idx = 0
+    if checkpoint_idx == 0:
+        model_path = pretrained_model_path
+    else:
+        model_path = f"./checkpoint/checkpoint-{checkpoint_idx}"
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"--------------Detected device {device}--------------\n")
+
+    if config['summary_model_name'] == "google_pegasus_xsum":
+        summary_model = PegasusHeadWithValueModel.from_pretrained(model_path).to(device)
+        summary_model_ref = PegasusHeadWithValueModel.from_pretrained(pretrained_model_path).to(device)
+        summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
+    elif config['summary_model_name'] == "gpt2":
+        summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
+        summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path=model_path).to(device)
+        summary_model_ref = GPT2HeadWithValueModel.from_pretrained(
+            pretrained_model_name_or_path=pretrained_model_path).to(
+            device)
+    else:
+        raise NotImplementedError
+    summary_tokenizer.pad_token = " "
+
+    qa_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-base-qg-hl")
+    qa_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-base-qg-hl")
+    ans_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-small-qa-qg-hl")
+    ans_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-small-qa-qg-hl").to(device)
+    gen_answer_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-cased-distilled-squad")
+    gen_answer_model = AutoModelForQuestionAnswering.from_pretrained("distilbert-base-cased-distilled-squad").to(device)
+
+    wandb.watch(summary_model, log='all')
 
     main()
