@@ -2,6 +2,17 @@
 	padding: 20px;
 }
 
+div#loading {
+    width: 100px;
+    height: 100px;
+    margin: auto;
+    display: none;
+    background-image: url(/static/assets/loading.gif);
+    background-size: 100px;
+    cursor: wait;
+}
+
+
 #upload_doc{
 	width: 100%;
 	height: 200px;

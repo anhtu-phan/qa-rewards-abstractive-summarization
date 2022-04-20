@@ -3,36 +3,48 @@
 	<head>
 		<title>Abstractive Summarization Using Question Answering Rewards</title>
 		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-		<link rel="stylesheet" href="https://cdn.staticfile.org/twitter-bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" type="text/css">
 		<link rel="stylesheet" href="/static/css/app.css" type="text/css">
+		<script src="https://cdn.staticfile.org/jquery/3.2.1/jquery.min.js"></script>
 	</head>
 	<body>
 		<div id="app">
 			<div>
 				<form id="upload-form" method="post" enctype="multipart/form-data">
-					<h5>Abstractive Summarization Using Question Answering Rewards</h5>
+					<h2>Abstractive Summarization Using Question Answering Rewards</h2>
 					<div class="form-content-container">
 						<textarea id="upload_doc" type="text" name="input_doc"></textarea>
 						<br>
-						<input id="upload_button" type="submit" value="Submit" />
+						<input id="upload_button" type="submit" value="Submit" onclick="loading();"/>
 					</div>
 				</form>
 			</div>
 			<hr>
-			<div id="result">
-				<table>
-					<tr>
-						<th>Original Model</th>
-						<th>Training with QA</th>
-					</tr>
+			<div>
+				<table id="result">
+					<thead>
+						<tr>
+							<th>Original Model</th>
+							<th>Training with QA</th>
+						</tr>
+					</thead>
 					{% if model_result %}
-					<tr>
-						<td>{{ model_result }}</td>
-						<td>{{ model_ref_result }}</td>
-					</tr>
+						<tbody>
+							<tr>
+								<td>{{ model_result }}</td>
+								<td>{{ model_ref_result }}</td>
+							</tr>
+						</tbody>
 					{% endif %}
 				</table>
 			</div>
+			<div id="loading"></div>
 		</div>
+		<script type="text/javascript">// <![CDATA[
+			function loading(){
+				$("#loading").show();
+				$("#result").find("tbody").hide();
+			}
+		// ]]>
+		</script>
 	</body>
 </html>

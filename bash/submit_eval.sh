@@ -11,5 +11,5 @@
 #SBATCH --mail-type=ALL
 
 source /home/students/anhtu/qa-rewards-abstractive-summarization/venv/bin/activate
-python /home/students/anhtu/qa-rewards-abstractive-summarization/eval.py
+python /home/students/anhtu/qa-rewards-abstractive-summarization/eval.py --model_path ./checkpoint/checkpoint-800 --model_ref_path ./finetuning/output/checkpoint-last --model_type gpt2
 deactivate
