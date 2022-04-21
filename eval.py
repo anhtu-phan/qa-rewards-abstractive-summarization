@@ -1,10 +1,5 @@
 import torch
-from transformers import (
-    PegasusTokenizer,
-    GPT2Tokenizer,
-)
-from ppo.gpt2 import GPT2HeadWithValueModel
-from ppo.pegasus import PegasusHeadWithValueModel
+from model import init_summary_model
 from ppo.utils import respond_to_batch
 from datasets import load_dataset
 from rouge_score import rouge_scorer
@@ -64,13 +59,15 @@ if __name__ == '__main__':
     parser.add_argument("--model_path", type=str)
     parser.add_argument("--model_ref_path", type=str)
     parser.add_argument("--model_type", type=str)
+    parser.add_argument("--max_token_len", type=str, default=512)
+    parser.add_argument("--batch_size", type=str, default=2)
 
     args = parser.parse_args()
     model_path = args.model_path
     model_ref_path = args.model_ref_path
     model_type = args.model_type
-    batch_size = 2
-    max_token_len = 512
+    batch_size = args.batch_size
+    max_token_len = args.max_token_len
 
     ds = load_dataset("xsum", split="test")
     ds.set_format('pandas')
@@ -78,20 +75,7 @@ if __name__ == '__main__':
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    if model_type == "google_pegasus_xsum":
-        summary_model = PegasusHeadWithValueModel.from_pretrained(pretrained_model_name_or_path=model_path).to(device)
-        summary_model_ref = PegasusHeadWithValueModel.from_pretrained(pretrained_model_name_or_path=model_ref_path).to(
-            device)
-        summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
-    elif model_type == "gpt2":
-        summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-        summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path=model_path).to(device)
-        summary_model_ref = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path=model_ref_path).to(
-            device)
-    else:
-        raise NotImplementedError
-
-    summary_tokenizer.pad_token = " "
+    summary_model, summary_model_ref, summary_tokenizer = init_summary_model(model_type, model_path, model_ref_path, device)
 
     measure = ['rouge1', 'rouge2', 'rougeL']
     scorer = rouge_scorer.RougeScorer(measure)

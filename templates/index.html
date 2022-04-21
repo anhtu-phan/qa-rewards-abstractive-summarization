@@ -11,8 +11,10 @@
 			<div>
 				<form id="upload-form" method="post" enctype="multipart/form-data">
 					<h2>Abstractive Summarization Using Question Answering Rewards</h2>
+					<br>
+					<h3>Using <i>{{model_type}}</i> to generate summary</h3>
 					<div class="form-content-container">
-						<textarea id="upload_doc" type="text" name="input_doc"></textarea>
+						<textarea id="upload_doc" type="text" name="input_doc">{% if doc_input %}{{doc_input}}{% endif %}</textarea>
 						<br>
 						<input id="upload_button" type="submit" value="Submit" onclick="loading();"/>
 					</div>
@@ -44,6 +46,10 @@
 				$("#loading").show();
 				$("#result").find("tbody").hide();
 			}
+			$("#upload-form").submit(function (e) {
+				$("#upload_button").attr("disabled", true);
+				return true;
+			});
 		// ]]>
 		</script>
 	</body>

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
-import time
+from model import init_summary_model
+from ppo.utils import respond_to_batch
+
+import torch
 from flask import Flask, request, render_template
 import argparse
 
@@ -9,15 +12,20 @@ app = Flask(__name__)
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', doc_input=None, model_type=model_type)
 
 
 @app.route('/', methods=['POST'])
 def index_post():
-    time.sleep(5)
-    result = request.form['input_doc']
-    print(f"result ===>>>>{result}")
-    return render_template('index.html', model_result=result, model_ref_result=result)
+    doc_input = request.form['input_doc']
+    encoding = summary_tokenizer.encode_plus(doc_input, return_tensors="pt", truncation=True, padding="max_length", max_length=max_token_len).to(device)
+    response_ids = respond_to_batch(summary_model, encoding['input_ids'].to(device), txt_len=80)
+    response_ids_ref = respond_to_batch(summary_model_ref, encoding['input_ids'].to(device), txt_len=80)
+
+    response = summary_tokenizer.decode(response_ids[0])
+    response_ref = summary_tokenizer.decode(response_ids_ref[0])
+
+    return render_template('index.html', doc_input=doc_input.strip(), model_type=model_type, model_result=response, model_ref_result=response_ref)
 
 
 def run(port):
@@ -28,23 +36,19 @@ def run(port):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', default=8769, type=int)
+    parser.add_argument('--model_type', type=str)
+    parser.add_argument('--model_path', type=str)
+    parser.add_argument('--model_ref_path', type=str)
+    parser.add_argument('--max_token_len', default=80, type=int)
     args = parser.parse_args()
-    # model_type = args.model_type
+    model_type = args.model_type
+    model_path = args.model_path
+    model_ref_path = args.model_ref_path
+    max_token_len = args.max_token_len
 
-    # if model_type == "google_pegasus_xsum":
-    #     summary_model = PegasusForConditionalGeneration.from_pretrained(pretrained_model_name_or_path=model_path).to(
-    #         device)
-    #     summary_model_ref = PegasusForConditionalGeneration.from_pretrained(
-    #         pretrained_model_name_or_path=model_ref_path).to(device)
-    #     summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
-    # elif model_type == "gpt2":
-    #     summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-    #     summary_model = GPT2Model.from_pretrained(pretrained_model_name_or_path=model_path,
-    #                                               max_length=max_token_len).to(device)
-    #     summary_model_ref = GPT2Model.from_pretrained(pretrained_model_name_or_path=model_ref_path,
-    #                                                   max_length=max_token_len).to(device)
-    # else:
-    #     raise NotImplementedError
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    summary_model, summary_model_ref, summary_tokenizer = init_summary_model(model_type, model_path, model_ref_path, device)
 
     run(args.port)
 

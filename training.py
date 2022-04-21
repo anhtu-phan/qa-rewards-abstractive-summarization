@@ -6,21 +6,13 @@ import numpy as np
 import pandas as pd
 import torch
 from tqdm import tqdm
-from transformers import (
-    PegasusTokenizer,
-    GPT2Tokenizer,
-    AutoTokenizer,
-    AutoModelForQuestionAnswering,
-    AutoModelForSeq2SeqLM,
-)
 from datasets import load_dataset
 import wandb
 
-from ppo.gpt2 import GPT2HeadWithValueModel
-from ppo.pegasus import PegasusHeadWithValueModel
 from ppo.ppo import PPOTrainer
 from ppo.utils import respond_to_batch
 from qa_generation import QAGeneration
+from model import init_summary_model, init_qa_model
 
 tqdm.pandas()
 
@@ -32,7 +24,7 @@ def prepare_data():
     return df
 
 
-def gen_answer(questions, context):
+def gen_answer(questions, context, use_cuda=False):
     batch_question_context = []
 
     for question in questions:
@@ -44,7 +36,11 @@ def gen_answer(questions, context):
     if str_questions.strip() == '':
         return []
     encoding = gen_answer_tokenizer.batch_encode_plus(batch_question_context, padding=True, return_tensors="pt")
-    input_ids, attention_mask = encoding["input_ids"].to(device), encoding["attention_mask"].to(device)
+    if use_cuda:
+        input_ids, attention_mask = encoding["input_ids"].to(device), encoding["attention_mask"].to(device)
+    else:
+        input_ids, attention_mask = encoding["input_ids"], encoding["attention_mask"]
+
     outputs = gen_answer_model(input_ids, attention_mask=attention_mask)
     start_scores, end_scores = outputs.start_logits, outputs.end_logits
 
@@ -112,8 +108,8 @@ def norm_levenshtein(seq1, seq2):
     return reward
 
 
-def reward_calculation(generated_summaries, ground_truth_summaries):
-    qa_gen = QAGeneration(model=qa_model, tokenizer=qa_tokenizer, ans_model=ans_model, ans_tokenizer=ans_tokenizer)
+def reward_calculation(generated_summaries, ground_truth_summaries, use_cuda=False):
+    qa_gen = QAGeneration(model=qa_model, tokenizer=qa_tokenizer, ans_model=ans_model, ans_tokenizer=ans_tokenizer, use_cuda=use_cuda)
 
     qa_g_a = []
     for gen_sum in generated_summaries:
@@ -131,12 +127,12 @@ def reward_calculation(generated_summaries, ground_truth_summaries):
         g_questions = l_q_g_a[idx]
         t_questions = l_q_g_t[idx]
 
-        a_g_a_ = gen_answer(g_questions, truth_sum)
+        a_g_a_ = gen_answer(g_questions, truth_sum, use_cuda)
         r_a = 0
         for a_idx, a_g in enumerate(a_g_a_):
             r_a += norm_levenshtein(a_g, l_a_g_a[idx][a_idx])
 
-        a_g_t_ = gen_answer(t_questions, generated_summaries[idx])
+        a_g_t_ = gen_answer(t_questions, generated_summaries[idx], use_cuda)
         r_t = 0
         for t_idx, a_t in enumerate(a_g_t_):
             r_t += norm_levenshtein(a_t, l_a_g_t[idx][t_idx])
@@ -150,7 +146,7 @@ def reward_calculation(generated_summaries, ground_truth_summaries):
 
 def tokenize_document(row):
     encoding = summary_tokenizer.encode_plus(row['document'], return_tensors="pt", truncation=True,
-                                             padding="max_length", max_length=config['max_token_len']).to(device)
+                                             padding="max_length", max_length=config['max_token_len'])
     row['tokens'] = encoding["input_ids"][0, :]
     row['attention_mask'] = encoding["attention_mask"][0, :]
     return row
@@ -217,7 +213,7 @@ def main():
         timing['time/get_response'] = time.time() - t
 
         t = time.time()
-        rewards = reward_calculation(game_data['response'], ground_truth_sum)
+        rewards = reward_calculation(game_data['response'], ground_truth_sum, config['use_cuda_for_qa'])
         timing['time/get_rewards'] = time.time() - t
 
         t = time.time()
@@ -251,20 +247,28 @@ if __name__ == "__main__":
         description="Abstractive Summarization using Question Answering Rewards Training")
     parser.add_argument("--pretrained_model_path", type=str)
     parser.add_argument("--summary_model_name", type=str)
+    parser.add_argument("--max_token_len", type=int)
+    parser.add_argument("--max_sum_token_len", type=int)
 
     args = parser.parse_args()
 
     config = {
-        "batch_size": 4,
+        "batch_size": 2,
         "steps": 100000,
-        "forward_batch_size": 2,
-        "max_token_len": 128,
-        "max_sum_token_len": 60,
+        "forward_batch_size": 1,
+        "max_token_len": 512,
+        "max_sum_token_len": 80,
         "summary_model_name": "gpt2",
+        "use_cuda_for_qa": False
     }
 
     pretrained_model_path = args.pretrained_model_path
-    config['summary_model_name'] = args.summary_model_name
+    if args.summary_model_name:
+        config['summary_model_name'] = args.summary_model_name
+    if args.max_token_len:
+        config['max_token_len'] = args.max_token_len
+    if args.max_sum_token_len:
+        config['max_sum_token_len'] = args.max_sum_token_len
 
     wandb_run_name = f'run-{config["summary_model_name"]}'
     wandb.init(name=wandb_run_name, project='qa-summarization', config=config, resume=True)
@@ -278,26 +282,10 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"--------------Detected device {device}--------------\n")
 
-    if config['summary_model_name'] == "google_pegasus_xsum":
-        summary_model = PegasusHeadWithValueModel.from_pretrained(model_path).to(device)
-        summary_model_ref = PegasusHeadWithValueModel.from_pretrained(pretrained_model_path).to(device)
-        summary_tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
-    elif config['summary_model_name'] == "gpt2":
-        summary_tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
-        summary_model = GPT2HeadWithValueModel.from_pretrained(pretrained_model_name_or_path=model_path).to(device)
-        summary_model_ref = GPT2HeadWithValueModel.from_pretrained(
-            pretrained_model_name_or_path=pretrained_model_path).to(
-            device)
-    else:
-        raise NotImplementedError
-    summary_tokenizer.pad_token = " "
+    summary_model, summary_model_ref, summary_tokenizer = init_summary_model(config['summary_model_name'], model_path, pretrained_model_path, device)
+    print("-"*20+"LOAD SUMMARY DONE -> LOAD QA MODEL"+"-"*20)
 
-    qa_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-base-qg-hl")
-    qa_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-base-qg-hl")
-    ans_tokenizer = AutoTokenizer.from_pretrained("valhalla/t5-small-qa-qg-hl")
-    ans_model = AutoModelForSeq2SeqLM.from_pretrained("valhalla/t5-small-qa-qg-hl").to(device)
-    gen_answer_tokenizer = AutoTokenizer.from_pretrained("distilbert-base-cased-distilled-squad")
-    gen_answer_model = AutoModelForQuestionAnswering.from_pretrained("distilbert-base-cased-distilled-squad").to(device)
+    qa_tokenizer, qa_model, ans_tokenizer, ans_model, gen_answer_tokenizer, gen_answer_model = init_qa_model(device, config['use_cuda_for_qa'])
 
     wandb.watch(summary_model, log='all')
 
