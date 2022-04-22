@@ -208,8 +208,6 @@ class PPOTrainer:
             m_input = m_input.to(self.device)
             ref_logits = ref_logits.to(self.device)
 
-            print(f"{'-'*10}{'>'*10} move to {self.device}")
-
             values.append(v[:, -gen_len - 1:-1].detach())
             logprobs.append(logprobs_from_logits(logits[:, :-1, :], m_input[:, 1:])[:, -gen_len:].detach())
             ref_logprobs.append(logprobs_from_logits(ref_logits[:, :-1, :], m_input[:, 1:])[:, -gen_len:].detach())
