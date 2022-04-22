@@ -155,8 +155,8 @@ def tokenize_document(row):
 def main():
     if not os.path.exists("./datasets"):
         os.makedirs("./datasets")
-    if not os.path.exists("./checkpoint"):
-        os.makedirs("./checkpoint")
+    if not os.path.exists(f"./checkpoint/{config['summary_model_name']}"):
+        os.makedirs(f"./checkpoint/{config['summary_model_name']}")
 
     x_sum_path = f"./datasets/x_sum_{config['summary_model_name']}.pkl"
     if os.path.exists(x_sum_path):
@@ -226,7 +226,7 @@ def main():
         timing['time/epoch'] = time.time() - t0
         if step_idx != 0 and step_idx % 100 == 0:
             summary_model.save_pretrained(
-                f"./checkpoint/checkpoint-{step_idx}")
+                f"./checkpoint/{config['summary_model_name']}/checkpoint-{step_idx}")
 
         table_rows = [list(r) for r in zip(game_data['query'], game_data['response'], rewards.cpu().tolist())]
         logs.update({'game_log': wandb.Table(
@@ -253,13 +253,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     config = {
-        "batch_size": 2,
+        "batch_size": 4,
         "steps": 100000,
-        "forward_batch_size": 1,
+        "forward_batch_size": 2,
         "max_token_len": 512,
         "max_sum_token_len": 80,
         "summary_model_name": "gpt2",
-        "use_cuda_for_qa": False
+        "use_cuda_for_qa": False,
+        "use_cuda_for_ref_model": False,
     }
 
     pretrained_model_path = args.pretrained_model_path

@@ -101,7 +101,7 @@ class PPOTrainer:
         """
         self.ppo_params = self.default_params
         self.ppo_params.update(ppo_params)
-
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.ref_model = ref_model
         self.model = model
         self.optimizer = Adam(model.parameters(), lr=self.ppo_params['lr'])
@@ -197,10 +197,18 @@ class PPOTrainer:
             if decode_inputs is not None:
                 m_decode_ids = decode_inputs[i * fbs:(i + 1) * fbs]
                 logits, _, v = self.model(input_ids=m_input, decoder_input_ids=m_decode_ids)
+                if not self.ppo_params['use_cuda_for_ref_model']:
+                    m_input = m_input.cpu()
+                    m_decode_ids = m_decode_ids.cpu()
                 ref_logits, _, _ = self.ref_model(input_ids=m_input, decoder_input_ids=m_decode_ids)
             else:
                 logits, _, v = self.model(m_input)
                 ref_logits, _, _ = self.ref_model(m_input)
+
+            m_input = m_input.to(self.device)
+            ref_logits = ref_logits.to(self.device)
+
+            print(f"{'-'*10}{'>'*10} move to {self.device}")
 
             values.append(v[:, -gen_len - 1:-1].detach())
             logprobs.append(logprobs_from_logits(logits[:, :-1, :], m_input[:, 1:])[:, -gen_len:].detach())

@@ -10,10 +10,12 @@ from transformers import (
 )
 
 
-def init_summary_model(model_type, model_path, pretrained_model_path, device):
+def init_summary_model(model_type, model_path, pretrained_model_path, device, use_cuda_ref_model=False):
     if model_type == PEGASUS:
         model = PegasusHeadWithValueModel.from_pretrained(model_path).to(device)
-        model_ref = PegasusHeadWithValueModel.from_pretrained(pretrained_model_path).to(device)
+        model_ref = PegasusHeadWithValueModel.from_pretrained(pretrained_model_path)
+        if use_cuda_ref_model:
+            model_ref.to(device)
         tokenizer = PegasusTokenizer.from_pretrained("google/pegasus-xsum")
     elif model_type == GPT2:
         tokenizer = GPT2Tokenizer.from_pretrained("gpt2")
