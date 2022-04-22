@@ -5,6 +5,10 @@
 <p align = "center">
 The training process for the summarization framework with QA rewards <a href="https://aclanthology.org/2021.findings-emnlp.47.pdf">[paper]</a>
 </p>
+This project will implement the framework proposed in <a href="https://aclanthology.org/2021.findings-emnlp.47.pdf">this paper</a> that provides a general methodology for training abstractive summarization models to address the hallucination problems
+such as missing key information in source documents (low recall) or generated summaries be
+containing facts that are inconsistent with the source documents (low precision). The framework used question-answering based rewards to further train the pre-trained summarization
+models in a Reinforcement Learning (RL) context.
 
 ## How to run 
 
