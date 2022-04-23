@@ -1,4 +1,4 @@
-# qa-rewards-abstractive-summarization
+# Improve Abstractive Summarization by using Question Answering Rewards 
 <p align = "center">
 <img src = "https://i.imgur.com/jMh44dK.png">
 </p>
