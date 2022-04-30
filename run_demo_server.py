@@ -19,8 +19,17 @@ def index():
 def index_post():
     doc_input = request.form['input_doc']
     encoding = summary_tokenizer.encode_plus(doc_input, return_tensors="pt", truncation=True, padding="max_length", max_length=max_token_len).to(device)
-    response_ids = respond_to_batch(summary_model, encoding['input_ids'].to(device), txt_len=80)
-    response_ids_ref = respond_to_batch(summary_model_ref, encoding['input_ids'].to(device), txt_len=80)
+    if model_type == "gpt2":
+        response_ids = respond_to_batch(summary_model, encoding['input_ids'].to(device), txt_len=80)
+        response_ids_ref = respond_to_batch(summary_model_ref, encoding['input_ids'].to(device), txt_len=80)
+
+    elif model_type == "google_pegasus_xsum":
+        response_ids = respond_to_batch(summary_model, encoding['input_ids'].to(device), txt_len=80,
+                                        eos_token=summary_tokenizer.eos_token_id, device=device)
+        response_ids_ref = respond_to_batch(summary_model_ref, encoding['input_ids'].to(device), txt_len=80,
+                                            eos_token=summary_tokenizer.eos_token_id, device=device)
+    else:
+        raise NotImplementedError
 
     response = summary_tokenizer.decode(response_ids[0])
     response_ref = summary_tokenizer.decode(response_ids_ref[0])

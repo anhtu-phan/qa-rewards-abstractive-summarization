@@ -15,14 +15,23 @@ def main():
         result_ref[me] = {'precision': 0, 'recall': 0, 'f_measure': 0}
 
     for i in tqdm(range(0, df.shape[0], batch_size)):
-        print(f"--------------- batch {i} ---------------\n")
+        # print(f"--------------- batch {i} ---------------\n")
         df_batch = df.iloc[i:min(i + batch_size, df.shape[0])]
         df_batch.reset_index(inplace=True)
-        print(f"df_batch: {df_batch}\n")
+        # print(f"df_batch: {df_batch}\n")
         encoding = summary_tokenizer.batch_encode_plus(df_batch['document'], return_tensors="pt", truncation=True,
                                                        padding="max_length", max_length=max_token_len).to(device)
-        response_ids = respond_to_batch(summary_model, encoding['input_ids'].to(device), txt_len=80)
-        response_ids_ref = respond_to_batch(summary_model_ref, encoding['input_ids'].to(device), txt_len=80)
+        if model_type == "gpt2":
+            response_ids = respond_to_batch(summary_model, encoding['input_ids'].to(device), txt_len=80)
+            response_ids_ref = respond_to_batch(summary_model_ref, encoding['input_ids'].to(device), txt_len=80)
+
+        elif model_type == "google_pegasus_xsum":
+            response_ids = respond_to_batch(summary_model, encoding['input_ids'].to(device), txt_len=80,
+                                            eos_token=summary_tokenizer.eos_token_id, device=device)
+            response_ids_ref = respond_to_batch(summary_model_ref, encoding['input_ids'].to(device), txt_len=80,
+                                                eos_token=summary_tokenizer.eos_token_id, device=device)
+        else:
+            raise NotImplementedError
 
         response = summary_tokenizer.batch_decode(response_ids)
         response_ref = summary_tokenizer.batch_decode(response_ids_ref)
@@ -38,7 +47,7 @@ def main():
                 result_ref[me]['precision'] += ref_score[me].precision
                 result_ref[me]['recall'] += ref_score[me].recall
                 result_ref[me]['f_measure'] += ref_score[me].fmeasure
-        print(f"result: {result}\n\nresult_ref: {result_ref}\n")
+        # print(f"result: {result}\n\nresult_ref: {result_ref}\n")
 
     for me in measure:
         result[me]['precision'] /= df.shape[0]
@@ -49,8 +58,8 @@ def main():
         result_ref[me]['recall'] /= df.shape[0]
         result_ref[me]['f_measure'] /= df.shape[0]
 
-    print(result)
-    print(result_ref)
+    print(f"{('-'*10)}Result{('-'*10)}\n{result}\n")
+    print(f"{('-' * 10)}Result_ref{('-' * 10)}\n{result_ref}\n")
 
 
 if __name__ == '__main__':
