@@ -18,8 +18,10 @@ models in a Reinforcement Learning (RL) context.
 
 ## How to run
 
-- The pre-trained model trains with question-answering based reward can be downloaded from <a href='https://drive.google.com/drive/folders/1-zYEyohanDyyMFZmgnfozLxqwxmN2ydc?usp=sharing'>here</a>
+- The pre-trained model trains with question-answering based reward using GPT-2 can be downloaded from <a href='https://drive.google.com/drive/folders/1-zYEyohanDyyMFZmgnfozLxqwxmN2ydc?usp=sharing'>here</a>
 - The pre-trained summarization GPT-2 model can be downloaded from <a href='https://drive.google.com/drive/folders/1i7ZoxNiTyFm6_i7AMLdLK17b-U9muKqd?usp=sharing'>here</a>
+- The pre-trained model trains with question-answering based reward using PEGASUS can be downloaded from <a href='https://drive.google.com/drive/folders/1iF-fZ1U92se35gWz0zS3s4U47OE2suvB?usp=sharing'>here</a>
+- The pre-trained summarization PEGASUS model can be downloaded from <a href='https://drive.google.com/drive/folders/1QFq9A-uVDti4BiWHMQ12CFhWNPw6GGHc?usp=sharing'>here</a>
 
 ### Install 
 
